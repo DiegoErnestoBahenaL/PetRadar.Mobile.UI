@@ -136,7 +136,6 @@
             android:text="He leído y acepto el aviso de privacidad"
             android:layout_marginBottom="16dp" />
 
-        <!-- Mensajes de error (correo ya registrado, contraseña débil, etc.) -->
         <TextView
             android:id="@+id/tvRegisterError"
             android:layout_width="match_parent"
