@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.petradar"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -56,6 +56,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.coordinatorlayout:coordinatorlayout:1.2.0")
     implementation("androidx.drawerlayout:drawerlayout:1.2.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 
     // Retrofit para llamadas HTTP
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -70,6 +71,21 @@ dependencies {
     // ViewModel y LiveData
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.activity:activity-ktx:1.8.2")
+
+    // Compose Animation
+    implementation("androidx.compose.animation:animation:1.6.4")
+
+    // Compose Icons Extended
+    implementation("androidx.compose.material:material-icons-extended:1.6.4")
+
+    // Compose LiveData integration
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.4")
+
+    // Coil — image loading for Compose
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

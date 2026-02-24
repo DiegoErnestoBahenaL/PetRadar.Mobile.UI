@@ -75,9 +75,15 @@ class ProfileViewModel : ViewModel() {
                 )
                 val response = repository.updateUser(userId, request)
                 if (response.isSuccessful) {
-                    // Recargar el perfil actualizado
-                    loadUserProfile(userId)
+                    // Optimistically update the local profile so the UI reflects changes immediately
+                    _userProfile.value = _userProfile.value?.copy(
+                        name = name ?: _userProfile.value?.name ?: "",
+                        lastName = lastName ?: _userProfile.value?.lastName,
+                        phoneNumber = phoneNumber ?: _userProfile.value?.phoneNumber
+                    )
                     _updateSuccess.value = true
+                    // Refresh from server in background to stay in sync
+                    loadUserProfile(userId)
                 } else {
                     _errorMessage.value = "Error al actualizar: ${response.code()} - ${response.message()}"
                 }
@@ -89,6 +95,8 @@ class ProfileViewModel : ViewModel() {
             }
         }
     }
+
+    fun clearUpdateSuccess() { _updateSuccess.value = false }
 }
 
 

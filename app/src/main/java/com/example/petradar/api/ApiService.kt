@@ -95,7 +95,87 @@ interface ApiService {
      */
     @DELETE("api/UserPets/{id}")
     suspend fun deleteUserPet(@Path("id") petId: Long): Response<Unit>
+
+    // ========== Endpoints de Citas Veterinarias ==========
+
+    /** GET /api/VeterinaryAppointments/user/{userId} */
+    @GET("api/VeterinaryAppointments/user/{userId}")
+    suspend fun getAppointmentsByUserId(@Path("userId") userId: Long): Response<List<VeterinaryAppointmentViewModel>>
+
+    /** GET /api/VeterinaryAppointments/pet/{petId} */
+    @GET("api/VeterinaryAppointments/pet/{petId}")
+    suspend fun getAppointmentsByPetId(@Path("petId") petId: Long): Response<List<VeterinaryAppointmentViewModel>>
+
+    /** GET /api/VeterinaryAppointments/{id} */
+    @GET("api/VeterinaryAppointments/{id}")
+    suspend fun getAppointmentById(@Path("id") id: Long): Response<VeterinaryAppointmentViewModel>
+
+    /** POST /api/VeterinaryAppointments */
+    @POST("api/VeterinaryAppointments")
+    suspend fun createAppointment(@Body request: VeterinaryAppointmentCreateModel): Response<Unit>
+
+    /** PUT /api/VeterinaryAppointments/{id} */
+    @PUT("api/VeterinaryAppointments/{id}")
+    suspend fun updateAppointment(
+        @Path("id") id: Long,
+        @Body request: VeterinaryAppointmentUpdateModel
+    ): Response<Unit>
+
+    /** DELETE /api/VeterinaryAppointments/{id} */
+    @DELETE("api/VeterinaryAppointments/{id}")
+    suspend fun deleteAppointment(@Path("id") id: Long): Response<Unit>
 }
+
+// ========== Modelos de Citas Veterinarias ==========
+
+data class VeterinaryAppointmentViewModel(
+    val id: Long,
+    val petId: Long,
+    val veterinaryName: String?,
+    val appointmentType: String?,   // Checkup | Vaccination | Surgery | Grooming | Consultation | Other
+    val appointmentStatus: String?, // Scheduled | Cancelled
+    val appointmentDate: String,    // ISO-8601
+    val durationInMinutes: Int?,
+    val reasonForVisit: String?,
+    val notes: String?,
+    val diagnosis: String?,
+    val treatment: String?,
+    val prescriptions: String?,
+    val cost: Double?,
+    val addressText: String?,
+    val reminderSent: Boolean
+)
+
+data class VeterinaryAppointmentCreateModel(
+    val petId: Long,
+    val veterinaryName: String? = null,
+    val appointmentType: String,   // required enum
+    val appointmentStatus: String, // required enum
+    val appointmentDate: String,   // ISO-8601 datetime
+    val durationInMinutes: Int? = null,
+    val reasonForVisit: String,
+    val notes: String? = null,
+    val diagnosis: String? = null,
+    val treatment: String? = null,
+    val prescriptions: String? = null,
+    val cost: Double? = null,
+    val addressText: String? = null
+)
+
+data class VeterinaryAppointmentUpdateModel(
+    val veterinaryName: String? = null,
+    val appointmentType: String? = null,
+    val appointmentStatus: String? = null,
+    val appointmentDate: String? = null,
+    val durationInMinutes: Int? = null,
+    val reasonForVisit: String? = null,
+    val notes: String? = null,
+    val diagnosis: String? = null,
+    val treatment: String? = null,
+    val prescriptions: String? = null,
+    val cost: Double? = null,
+    val addressText: String? = null
+)
 
 // ========== Modelos de Mascotas ==========
 
