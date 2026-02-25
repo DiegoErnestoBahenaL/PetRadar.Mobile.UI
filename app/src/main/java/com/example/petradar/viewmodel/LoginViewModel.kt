@@ -1,31 +1,33 @@
 package com.example.petradar.viewmodel
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.petradar.api.models.LoginResponse
 import com.example.petradar.api.models.UserProfile
 import com.example.petradar.repository.AuthRepository
 import com.example.petradar.repository.UserRepository
+import com.example.petradar.utils.AuthManager
 import kotlinx.coroutines.launch
 
 /**
  * ViewModel para manejar la lógica de Login y Registro
  */
-class LoginViewModel : ViewModel() {
+class LoginViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
     private val userRepository = UserRepository()
 
     private val _loginResult = MutableLiveData<LoginResponse?>()
-    val loginResult: LiveData<LoginResponse?> = _loginResult
+
+    private val _loginSuccess = MutableLiveData<Boolean>()
+    val loginSuccess: LiveData<Boolean> = _loginSuccess
 
     private val _userProfile = MutableLiveData<UserProfile?>()
-    val userProfile: LiveData<UserProfile?> = _userProfile
 
     private val _registerSuccess = MutableLiveData<Boolean>()
-    val registerSuccess: LiveData<Boolean> = _registerSuccess
 
     private val _registerCredentials = MutableLiveData<Pair<String, String>?>()
     val registerCredentials: LiveData<Pair<String, String>?> = _registerCredentials
@@ -48,10 +50,21 @@ class LoginViewModel : ViewModel() {
             try {
                 val response = authRepository.login(username, password)
                 if (response.isSuccessful && response.body() != null) {
-                    _loginResult.value = response.body()
+                    val loginResponse = response.body()!!
+                    _loginResult.value = loginResponse
 
-                    // Después del login exitoso, intentar obtener el userId buscando en la lista de usuarios
+                    // Save token immediately so subsequent calls include Authorization header
+                    AuthManager.saveAuthToken(
+                        getApplication(),
+                        loginResponse.token,
+                        loginResponse.refreshToken
+                    )
+
+                    // Fetch user profile (blocking) so userId is saved before navigating
                     fetchUserIdByEmail(username)
+
+                    // Signal login success so the UI navigates to Home
+                    _loginSuccess.value = true
                 } else {
                     val errorMsg = when (response.code()) {
                         400 -> "Datos incorrectos"
@@ -76,19 +89,26 @@ class LoginViewModel : ViewModel() {
      */
     private suspend fun fetchUserIdByEmail(email: String) {
         try {
-            // Intentar obtener todos los usuarios y buscar por email
             val response = userRepository.getAllUsers()
             if (response.isSuccessful) {
                 val users = response.body()
                 val user = users?.find { it.email.equals(email, ignoreCase = true) }
                 if (user != null) {
+                    val fullName = "${user.name} ${user.lastName ?: ""}".trim()
+                    AuthManager.saveUserInfo(getApplication(), user.id ?: 0L, user.email, fullName)
                     _userProfile.value = user
+                } else {
+                    // User not found in list — save email as fallback
+                    AuthManager.saveUserInfo(getApplication(), 0L, email, "")
                 }
+            } else {
+                // API call failed — save email as fallback so app can still open
+                AuthManager.saveUserInfo(getApplication(), 0L, email, "")
             }
         } catch (e: Exception) {
-            // Si falla, no pasa nada, el userId se quedará en 0
-            // Se actualizará cuando el usuario vea su perfil
             e.printStackTrace()
+            // Network error — save email as fallback
+            AuthManager.saveUserInfo(getApplication(), 0L, email, "")
         } finally {
             _isLoading.value = false
         }
@@ -120,6 +140,7 @@ class LoginViewModel : ViewModel() {
                 } else {
                     val errorMsg = when (response.code()) {
                         400 -> "Datos inválidos. Verifica la información"
+                        401 -> "El registro requiere permisos de administrador en este ambiente. Contacta al equipo de backend para crear tu cuenta."
                         409 -> "El email ya está registrado"
                         500 -> "Error del servidor. Intenta más tarde"
                         else -> "Error al registrarse: ${response.code()}"
@@ -133,13 +154,6 @@ class LoginViewModel : ViewModel() {
                 _isLoading.value = false
             }
         }
-    }
-
-    /**
-     * Limpiar mensajes de error
-     */
-    fun clearError() {
-        _errorMessage.value = null
     }
 
     /**

@@ -2,6 +2,7 @@ package com.example.petradar.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 
 /**
  * Clase helper para manejar el almacenamiento de datos de autenticación
@@ -38,13 +39,6 @@ object AuthManager {
     }
 
     /**
-     * Obtener el refresh token
-     */
-    fun getRefreshToken(context: Context): String? {
-        return getPrefs(context).getString(KEY_REFRESH_TOKEN, null)
-    }
-
-    /**
      * Guardar información del usuario
      */
     fun saveUserInfo(context: Context, userId: Long, email: String, name: String) {
@@ -61,7 +55,7 @@ object AuthManager {
      */
     fun getUserId(context: Context): Long? {
         val id = getPrefs(context).getLong(KEY_USER_ID, -1L)
-        return if (id == -1L) null else id
+        return if (id <= 0L) null else id
     }
 
     /**
@@ -79,17 +73,17 @@ object AuthManager {
     }
 
     /**
-     * Verificar si el usuario está autenticado
+     * Verificar si el usuario está autenticado (token presente)
      */
     fun isAuthenticated(context: Context): Boolean {
-        return getAuthToken(context) != null && getUserId(context) != null
+        return !getAuthToken(context).isNullOrEmpty()
     }
 
     /**
      * Cerrar sesión y limpiar datos
      */
     fun logout(context: Context) {
-        getPrefs(context).edit().clear().apply()
+        getPrefs(context).edit { clear() }
     }
 }
 
