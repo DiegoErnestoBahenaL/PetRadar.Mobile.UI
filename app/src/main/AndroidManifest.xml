@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- For Android 12 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <application
         android:name=".PetRadarApplication"
@@ -20,7 +23,7 @@
         <activity
             android:name=".LoginActivity"
             android:exported="true"
-            android:label="Iniciar Sesión">
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,10 +35,6 @@
             android:label="Registro"
             android:parentActivityName=".LoginActivity" />
         <activity
-            android:name=".MainActivity"
-            android:exported="false"
-            android:label="@string/app_name" />
-        <activity
             android:name=".HomeActivity"
             android:exported="false"
             android:label="Home" />
@@ -44,6 +43,26 @@
             android:exported="false"
             android:label="Mi Perfil"
             android:parentActivityName=".HomeActivity" />
+        <activity
+            android:name=".PetsActivity"
+            android:exported="false"
+            android:label="Mis Mascotas"
+            android:parentActivityName=".HomeActivity" />
+        <activity
+            android:name=".PetDetailActivity"
+            android:exported="false"
+            android:label="Mascota"
+            android:parentActivityName=".PetsActivity" />
+        <activity
+            android:name=".AppointmentsActivity"
+            android:exported="false"
+            android:label="Citas Veterinarias"
+            android:parentActivityName=".HomeActivity" />
+        <activity
+            android:name=".AppointmentFormActivity"
+            android:exported="false"
+            android:label="Cita"
+            android:parentActivityName=".AppointmentsActivity" />
     </application>
 
 </manifest>
