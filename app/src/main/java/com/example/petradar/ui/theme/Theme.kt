@@ -13,15 +13,15 @@ import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
     primary         = PetTeal80,
-    onPrimary       = Color(0xFF003135),
+    onPrimary       = Color.Black,
     secondary       = PetTealGrey80,
-    onSecondary     = Color(0xFF1A0047),
+    onSecondary     = Color.Black,
     tertiary        = PetGreen80,
     background      = DarkBackground,
     surface         = DarkSurface,
-    onBackground    = Color(0xFFE0F7FA),
-    onSurface       = Color(0xFFE0F7FA),
-    surfaceVariant  = Color(0xFF1C3050)
+    onBackground    = Color(0xFFE0E0E0),
+    onSurface       = Color(0xFFE0E0E0),
+    surfaceVariant  = Color(0xFF333333)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -33,8 +33,8 @@ private val LightColorScheme = lightColorScheme(
     tertiary        = PetGreen40,
     background      = PetBackground,
     surface         = PetSurface,
-    onBackground    = Color(0xFF00363A),
-    onSurface       = Color(0xFF00363A),
+    onBackground    = Color(0xFF121212),
+    onSurface       = Color(0xFF121212),
     surfaceVariant  = PetSurfaceVar,
     outline         = PetTeal40.copy(alpha = 0.4f)
 )

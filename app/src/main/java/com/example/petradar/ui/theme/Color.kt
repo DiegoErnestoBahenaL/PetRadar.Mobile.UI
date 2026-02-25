@@ -2,34 +2,28 @@ package com.example.petradar.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── PetRadar Glossy Brand Palette ──────────────────────────────
-// Primary: vibrant cyan-teal
-val PetTeal80  = Color(0xFF80DEEA)
-val PetTeal40  = Color(0xFF0097A7)
-val PetTeal20  = Color(0xFF006064)
+// ── PetRadar Modern & Friendly Palette ──────────────────────────────
 
-// Secondary: deep indigo-violet
-val PetTealGrey80 = Color(0xFFB39DDB)
-val PetTealGrey40 = Color(0xFF512DA8)
+// Primary: vibrant and friendly blue
+val PetTeal80  = Color(0xFF64B5F6) // Light Blue
+val PetTeal40  = Color(0xFF2196F3) // Main Blue
 
-// Tertiary: fresh green
-val PetGreen80 = Color(0xFFA5D6A7)
-val PetGreen40 = Color(0xFF2E7D32)
+// Secondary: warm and energetic orange
+val PetTealGrey80 = Color(0xFFFFB74D) // Light Orange
+val PetTealGrey40 = Color(0xFFF57C00) // Dark Orange
 
-// Accent: warm amber / gold for glossy highlights
-val PetAccent  = Color(0xFFFFB300)
-val PetGold    = Color(0xFFFDD835)
+// Tertiary: calming and natural green
+val PetGreen80 = Color(0xFF81C784) // Light Green
+val PetGreen40 = Color(0xFF388E3C) // Dark Green
 
-// Gradient stops
-val GradientTop    = Color(0xFF00BCD4)   // bright cyan
-val GradientMid    = Color(0xFF0288D1)   // royal blue
-val GradientBottom = Color(0xFF512DA8)   // deep violet
+// Accent: warm and vibrant orange/gold
+val PetAccent  = Color(0xFFFF9800) // Main Orange
 
-// Surfaces
-val PetBackground  = Color(0xFFF0FDFF)
+// Surfaces for Light Theme
+val PetBackground  = Color(0xFFF5F5F5)
 val PetSurface     = Color(0xFFFFFFFF)
-val PetSurfaceVar  = Color(0xFFE0F7FA)
+val PetSurfaceVar  = Color(0xFFEEEEEE)
 
-// Dark variants
-val DarkBackground = Color(0xFF0A1628)
-val DarkSurface    = Color(0xFF112240)
+// Surfaces for Dark Theme
+val DarkBackground = Color(0xFF121212)
+val DarkSurface    = Color(0xFF1E1E1E)

@@ -2,8 +2,6 @@
 
 package com.example.petradar.ui
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,14 +13,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.petradar.api.UserPetViewModel
-import com.example.petradar.ui.theme.PetTeal40
 import com.example.petradar.utils.PetPhotoStore
 import com.example.petradar.viewmodel.PetViewModel
 
@@ -46,7 +40,7 @@ fun PetsScreen(
 ) {
     val pets by viewModel.pets.observeAsState(emptyList())
     val isLoadingState by viewModel.isLoading.observeAsState(false)
-    val isLoading = isLoadingState ?: false
+    val isLoading = isLoadingState
     val errorMessage by viewModel.errorMessage.observeAsState()
 
     var petToDelete by remember { mutableStateOf<UserPetViewModel?>(null) }
@@ -63,7 +57,7 @@ fun PetsScreen(
 
     if (showDeleteDialog && petToDelete != null) {
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = { },
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Eliminar mascota") },
             text = { Text("¿Estás seguro de que deseas eliminar a ${petToDelete?.name ?: "esta mascota"}?") },
@@ -71,14 +65,13 @@ fun PetsScreen(
                 TextButton(
                     onClick = {
                         petToDelete?.let { p -> viewModel.deletePet(p.id, p.userId) }
-                        showDeleteDialog = false
                         petToDelete = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Cancelar") }
+                TextButton(onClick = { }) { Text("Cancelar") }
             }
         )
     }
@@ -92,12 +85,6 @@ fun PetsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                ),
-                windowInsets = WindowInsets.statusBars
             )
         },
         floatingActionButton = {
@@ -106,8 +93,6 @@ fun PetsScreen(
                     onClick = onAddPet,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
                     text = { Text("Nueva mascota") },
-                    containerColor = PetTeal40,
-                    contentColor = Color.White
                 )
             }
         },
@@ -125,7 +110,7 @@ fun PetsScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     isLoading && pets.isEmpty() -> {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = PetTeal40)
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
                     pets.isEmpty() -> {
                         EmptyPetsMessage(modifier = Modifier.align(Alignment.Center))
@@ -140,7 +125,7 @@ fun PetsScreen(
                                 PetCard(
                                     pet = pet,
                                     onEdit = { onEditPet(pet) },
-                                    onDelete = { petToDelete = pet; showDeleteDialog = true }
+                                    onDelete = { petToDelete = pet; }
                                 )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
@@ -162,7 +147,7 @@ private fun EmptyPetsMessage(modifier: Modifier = Modifier) {
             imageVector = Icons.Default.Face,
             contentDescription = null,
             modifier = Modifier.size(80.dp),
-            tint = PetTeal40.copy(alpha = 0.4f)
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
         )
         Spacer(Modifier.height(16.dp))
         Text(
@@ -208,7 +193,6 @@ private fun PetCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -216,7 +200,7 @@ private fun PetCard(
         ) {
             Box(
                 modifier = Modifier.size(56.dp).clip(CircleShape)
-                    .background(PetTeal40.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (photoUriStr != null) {
@@ -233,14 +217,14 @@ private fun PetCard(
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = pet.name ?: "Sin nombre", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text(text = "$speciesLabel · $petBreed", fontSize = 13.sp,
+                Text(text = pet.name ?: "Sin nombre", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Text(text = "$speciesLabel · $petBreed", style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                Text(text = sexLabel, fontSize = 12.sp, color = PetTeal40)
+                Text(text = sexLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
             Column {
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = PetTeal40)
+                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)

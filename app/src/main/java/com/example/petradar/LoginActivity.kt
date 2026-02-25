@@ -25,16 +25,9 @@ class LoginActivity : ComponentActivity() {
 
         val viewModel = ViewModelProvider(this)[LoginViewModel::class.java]
 
-        // Observe profile once token is retrieved and save user info
-        viewModel.loginResult.observe(this) { response ->
-            response?.let { AuthManager.saveAuthToken(this, it.token, it.refreshToken) }
-        }
-        viewModel.userProfile.observe(this) { profile ->
-            profile?.let {
-                val fullName = "${it.name} ${it.lastName ?: ""}".trim()
-                AuthManager.saveUserInfo(this, it.id ?: 0L, it.email, fullName)
-                navigateToHome()
-            }
+        // Navigate to home as soon as login succeeds (token already saved in ViewModel)
+        viewModel.loginSuccess.observe(this) { success ->
+            if (success == true) navigateToHome()
         }
 
         setContent {

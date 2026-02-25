@@ -19,12 +19,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.petradar.ui.theme.PetAccent
 import com.example.petradar.ui.theme.PetTeal40
 import kotlinx.coroutines.launch
@@ -48,19 +46,13 @@ fun HomeScreen(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface
-            ) {
+            ModalDrawerSheet {
                 // Drawer header
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(200.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(PetTeal40, MaterialTheme.colorScheme.secondary)
-                            )
-                        )
+                        .background(MaterialTheme.colorScheme.primary)
                         .padding(16.dp),
                     contentAlignment = Alignment.BottomStart
                 ) {
@@ -69,27 +61,27 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.3f)),
+                                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier.size(40.dp)
                             )
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
                             text = userName.ifBlank { "Usuario PetRadar" },
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = userEmail.ifBlank { "usuario@petradar.org" },
-                            color = Color.White.copy(alpha = 0.8f),
-                            fontSize = 13.sp
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                 }
@@ -174,8 +166,8 @@ fun HomeScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = Color.White,
-                        navigationIconContentColor = Color.White
+                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     windowInsets = WindowInsets.statusBars
                 )
@@ -198,7 +190,7 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = PetTeal40)
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Row(
                             modifier = Modifier
@@ -206,32 +198,24 @@ fun HomeScreen(
                                 .padding(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
                             Icon(
                                 imageVector = Icons.Default.Face,
                                 contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(32.dp)
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(48.dp)
                             )
-                        }
                             Spacer(Modifier.width(16.dp))
                             Column {
                                 Text(
                                     text = "¡Bienvenido!",
-                                    color = Color.White,
-                                    fontSize = 14.sp
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
                                     text = userName.ifBlank { "Usuario" },
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
@@ -246,7 +230,7 @@ fun HomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                // Quick access grid — row 1
+                // Quick access grid
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -259,7 +243,6 @@ fun HomeScreen(
                         QuickAccessCard(
                             icon = Icons.Default.Face,
                             title = "Mis Mascotas",
-                            subtitle = "Ver y gestionar",
                             color = PetTeal40,
                             onClick = onNavigateToPets
                         )
@@ -273,14 +256,12 @@ fun HomeScreen(
                         QuickAccessCard(
                             icon = Icons.Default.AccountCircle,
                             title = "Mi Perfil",
-                            subtitle = "Editar datos",
                             color = PetAccent,
                             onClick = onNavigateToProfile
                         )
                     }
                 }
 
-                // Quick access grid — row 2
                 AnimatedVisibility(
                     visible = visible,
                     enter = fadeIn(tween(500, 300)) + slideInVertically(tween(500, 300)) { 60 }
@@ -288,7 +269,6 @@ fun HomeScreen(
                     QuickAccessCard(
                         icon = Icons.Default.CalendarMonth,
                         title = "Citas Veterinarias",
-                        subtitle = "Calendario y agenda",
                         color = com.example.petradar.ui.theme.PetTealGrey40,
                         onClick = onNavigateToAppointments
                     )
@@ -302,7 +282,6 @@ fun HomeScreen(
 private fun QuickAccessCard(
     icon: ImageVector,
     title: String,
-    subtitle: String,
     color: Color,
     onClick: () -> Unit
 ) {
@@ -313,33 +292,18 @@ private fun QuickAccessCard(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(color.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = color,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(text = title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            Text(
-                text = subtitle,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(28.dp)
             )
+            Text(text = title, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
-

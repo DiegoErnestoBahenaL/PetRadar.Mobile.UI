@@ -8,7 +8,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.example.petradar.ui.RegisterScreen
 import com.example.petradar.ui.theme.PetRadarTheme
-import com.example.petradar.utils.AuthManager
 import com.example.petradar.viewmodel.LoginViewModel
 
 class RegisterActivity : ComponentActivity() {
@@ -19,22 +18,16 @@ class RegisterActivity : ComponentActivity() {
 
         val viewModel = ViewModelProvider(this)[LoginViewModel::class.java]
 
-        // Auto-login after register: save token + user info then navigate
-        viewModel.loginResult.observe(this) { response ->
-            response?.let { AuthManager.saveAuthToken(this, it.token, it.refreshToken) }
-        }
+        // Auto-login after register: login() now saves token internally
         viewModel.registerCredentials.observe(this) { credentials ->
             credentials?.let { (email, password) ->
                 viewModel.login(email, password)
                 viewModel.clearRegisterCredentials()
             }
         }
-        viewModel.userProfile.observe(this) { profile ->
-            profile?.let {
-                val fullName = "${it.name} ${it.lastName ?: ""}".trim()
-                AuthManager.saveUserInfo(this, it.id ?: 0L, it.email, fullName)
-                navigateToHome()
-            }
+        // Navigate to home as soon as login succeeds
+        viewModel.loginSuccess.observe(this) { success ->
+            if (success == true) navigateToHome()
         }
 
         setContent {

@@ -25,7 +25,6 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -34,9 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.petradar.ui.theme.PetTeal40
 import com.example.petradar.utils.PetPhotoStore
 import com.example.petradar.viewmodel.PetDetailViewModel
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,30 +47,26 @@ fun PetDetailScreen(
     val context = LocalContext.current
     val petData by viewModel.pet.observeAsState()
     val isLoadingRaw by viewModel.isLoading.observeAsState(false)
-    val isLoading = isLoadingRaw ?: false
+    val isLoading = isLoadingRaw
     val errorMessage by viewModel.errorMessage.observeAsState()
     val saveSuccessRaw by viewModel.saveSuccess.observeAsState(false)
-    val saveSuccess = saveSuccessRaw ?: false
+    val saveSuccess = saveSuccessRaw
 
     val snackbarHostState = remember { SnackbarHostState() }
     var visible by remember { mutableStateOf(false) }
 
-    // ── Photo state ───────────────────────────────────────────────
-    // Load existing stored URI when editing
     var photoUri by remember {
         mutableStateOf<Uri?>(
             if (isEditMode && viewModel.currentPetId > 0)
-                PetPhotoStore.get(context, viewModel.currentPetId)?.let { Uri.parse(it) }
+                PetPhotoStore.get(context, viewModel.currentPetId)?.toUri()
             else null
         )
     }
 
-    // Gallery launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> if (uri != null) photoUri = uri }
 
-    // ── Form fields ───────────────────────────────────────────────
     var petName by remember { mutableStateOf("") }
     var speciesLabel by remember { mutableStateOf("") }
     var speciesValue by remember { mutableStateOf("") }
@@ -124,12 +119,11 @@ fun PetDetailScreen(
         sizeLabel = foundSize?.first ?: p.size ?: ""
         sizeValue = foundSize?.second ?: p.size ?: ""
 
-        // Load photo from local store (fallback to API photoURL)
         if (photoUri == null) {
             val stored = PetPhotoStore.get(context, p.id)
             photoUri = when {
-                stored != null -> Uri.parse(stored)
-                !p.photoURL.isNullOrBlank() -> Uri.parse(p.photoURL)
+                stored != null -> stored.toUri()
+                !p.photoURL.isNullOrBlank() -> p.photoURL.toUri()
                 else -> null
             }
         }
@@ -155,16 +149,9 @@ fun PetDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                ),
-                windowInsets = WindowInsets.statusBars
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -175,7 +162,6 @@ fun PetDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ─── Photo picker ────────────────────────────────────────
             AnimatedVisibility(visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -30 }) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -185,8 +171,8 @@ fun PetDetailScreen(
                         modifier = Modifier
                             .size(120.dp)
                             .clip(CircleShape)
-                            .background(PetTeal40.copy(alpha = 0.12f))
-                            .border(2.dp, PetTeal40.copy(alpha = 0.4f), CircleShape)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape)
                             .clickable { photoPickerLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
@@ -200,22 +186,21 @@ fun PetDetailScreen(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize().clip(CircleShape)
                             )
-                            // Pencil overlay
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
                                     .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(PetTeal40),
+                                    .background(MaterialTheme.colorScheme.primary),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Edit, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
                             }
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.AddAPhoto, null, tint = PetTeal40, modifier = Modifier.size(36.dp))
+                                Icon(Icons.Default.AddAPhoto, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(4.dp))
-                                Text("Agregar foto", fontSize = 11.sp, color = PetTeal40, fontWeight = FontWeight.SemiBold)
+                                Text("Agregar foto", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -230,14 +215,12 @@ fun PetDetailScreen(
                 }
             }
 
-            // ─── Información Básica ───────────────────────────────────
             AnimatedVisibility(visible, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { -40 }) {
                 Text("Información Básica", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
 
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 80)) + slideInVertically(tween(400, 80)) { 40 }) {
-                Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = petName, onValueChange = { petName = it; nameError = null },
@@ -246,7 +229,6 @@ fun PetDetailScreen(
                             isError = nameError != null,
                             supportingText = nameError?.let { err -> { Text(err) } },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40),
                             enabled = !isLoading
                         )
                         ExposedDropdownMenuBox(expanded = speciesExpanded, onExpandedChange = { speciesExpanded = it }) {
@@ -257,7 +239,6 @@ fun PetDetailScreen(
                                 isError = speciesError != null,
                                 supportingText = speciesError?.let { err -> { Text(err) } },
                                 modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = speciesExpanded, onDismissRequest = { speciesExpanded = false }) {
@@ -268,16 +249,13 @@ fun PetDetailScreen(
                             }
                         }
                         OutlinedTextField(value = petBreed, onValueChange = { petBreed = it }, label = { Text("Raza") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
                         OutlinedTextField(value = petColor, onValueChange = { petColor = it }, label = { Text("Color") },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
                         ExposedDropdownMenuBox(expanded = sexExpanded, onExpandedChange = { sexExpanded = it }) {
                             OutlinedTextField(value = sexLabel, onValueChange = {}, readOnly = true, label = { Text("Sexo") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sexExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sexExpanded, onDismissRequest = { sexExpanded = false }) {
                                 sexOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sexLabel = label; sexValue = value; sexExpanded = false })
@@ -287,8 +265,7 @@ fun PetDetailScreen(
                         ExposedDropdownMenuBox(expanded = sizeExpanded, onExpandedChange = { sizeExpanded = it }) {
                             OutlinedTextField(value = sizeLabel, onValueChange = {}, readOnly = true, label = { Text("Tamaño") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sizeExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sizeExpanded, onDismissRequest = { sizeExpanded = false }) {
                                 sizeOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sizeLabel = label; sizeValue = value; sizeExpanded = false })
@@ -299,30 +276,24 @@ fun PetDetailScreen(
                 }
             }
 
-            // ─── Detalles Adicionales ─────────────────────────────────
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 150)) + slideInVertically(tween(400, 150)) { 40 }) {
                 Text("Detalles Adicionales", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 200)) + slideInVertically(tween(400, 200)) { 40 }) {
-                Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(value = birthDate, onValueChange = { birthDate = it },
                             label = { Text("Fecha de nacimiento (YYYY-MM-DD)") },
                             leadingIcon = { Icon(Icons.Default.DateRange, null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
                         OutlinedTextField(value = petWeight, onValueChange = { petWeight = it }, label = { Text("Peso (kg)") },
                             leadingIcon = { Icon(Icons.Default.MonitorWeight, null) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
                         OutlinedTextField(value = petDescription, onValueChange = { petDescription = it }, label = { Text("Descripción") },
-                            modifier = Modifier.fillMaxWidth(), minLines = 2,
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !isLoading)
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = isNeutered, onCheckedChange = { isNeutered = it }, enabled = !isLoading,
-                                colors = CheckboxDefaults.colors(checkedColor = PetTeal40))
+                            Checkbox(checked = isNeutered, onCheckedChange = { isNeutered = it }, enabled = !isLoading)
                             Spacer(Modifier.width(8.dp))
                             Text("Esterilizado/Castrado")
                         }
@@ -330,22 +301,18 @@ fun PetDetailScreen(
                 }
             }
 
-            // ─── Información Médica ───────────────────────────────────
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 250)) + slideInVertically(tween(400, 250)) { 40 }) {
                 Text("Información Médica", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 300)) + slideInVertically(tween(400, 300)) { 40 }) {
-                Card(shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(2.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(value = petAllergies, onValueChange = { petAllergies = it }, label = { Text("Alergias") },
                             leadingIcon = { Icon(Icons.Default.MedicalServices, null) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
                         OutlinedTextField(value = medicalNotes, onValueChange = { medicalNotes = it }, label = { Text("Notas médicas") },
                             leadingIcon = { Icon(Icons.Default.Description, null) },
-                            modifier = Modifier.fillMaxWidth(), minLines = 2,
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PetTeal40, focusedLabelColor = PetTeal40), enabled = !isLoading)
+                            modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !isLoading)
                     }
                 }
             }
@@ -358,10 +325,8 @@ fun PetDetailScreen(
                         if (petName.isBlank()) { nameError = "El nombre es requerido"; return@Button }
                         if (speciesValue.isBlank()) { speciesError = "Selecciona la especie"; return@Button }
 
-                        // Persist photo URI locally before saving
                         val currentId = viewModel.currentPetId
                         if (photoUri != null) {
-                            // For new pets we won't have an ID yet; save after API returns
                             if (currentId > 0) PetPhotoStore.save(context, currentId, photoUri.toString())
                         } else if (currentId > 0) {
                             PetPhotoStore.delete(context, currentId)
@@ -380,11 +345,10 @@ fun PetDetailScreen(
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = PetTeal40),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                     } else {
                         Icon(Icons.Default.CheckCircle, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
