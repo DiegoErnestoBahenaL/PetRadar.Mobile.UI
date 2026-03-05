@@ -2,11 +2,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:ignore="PhotoAndVideoPolicy" />
+    <uses-permission android:name="android.permission.CAMERA" />
     <!-- For Android 12 and below -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Exact alarms for appointment reminders -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"
+        tools:ignore="ExactAlarmPolicy" />
 
     <application
         android:name=".PetRadarApplication"
@@ -33,6 +45,11 @@
             android:name=".RegisterActivity"
             android:exported="false"
             android:label="Registro"
+            android:parentActivityName=".LoginActivity" />
+        <activity
+            android:name=".EmailVerificationActivity"
+            android:exported="false"
+            android:label="Verificar Email"
             android:parentActivityName=".LoginActivity" />
         <activity
             android:name=".HomeActivity"
@@ -63,6 +80,36 @@
             android:exported="false"
             android:label="Cita"
             android:parentActivityName=".AppointmentsActivity" />
+        <activity
+            android:name=".AdoptionAnimalsActivity"
+            android:exported="false"
+            android:label="Adopciones"
+            android:parentActivityName=".HomeActivity" />
+        <activity
+            android:name=".AdoptionAnimalFormActivity"
+            android:exported="false"
+            android:label="Animal en Adopción"
+            android:parentActivityName=".AdoptionAnimalsActivity" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- BroadcastReceiver for appointment alarm notifications -->
+        <receiver
+            android:name=".AppointmentAlarmReceiver"
+            android:exported="false" />
+
+        <!-- BroadcastReceiver for medication reminder notifications -->
+        <receiver
+            android:name=".MedicationAlarmReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

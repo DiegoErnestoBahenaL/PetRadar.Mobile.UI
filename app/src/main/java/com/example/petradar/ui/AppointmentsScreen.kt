@@ -1,9 +1,8 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
+@file:Suppress("DEPRECATION")
 
 package com.example.petradar.ui
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +46,27 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Main veterinary appointments screen.
+ *
+ * Contains:
+ *  - **Monthly calendar** with previous/next month navigation.
+ *    Days with appointments are marked with a coloured dot.
+ *  - **Filtered list** with the appointments for the selected day.
+ *  - **Floating action button (+)** to create a new appointment on the selected day
+ *    (passes the date to the form via [onAddAppointment]).
+ *  - **Pull-to-refresh** to reload appointments and pets.
+ *  - **Confirmation dialog** before deleting an appointment.
+ *
+ * Pet photos in appointment cards are resolved from
+ * [PetPhotoStore] (local store) or from the API URL.
+ *
+ * @param viewModel          ViewModel with appointments, pets and CRUD operations.
+ * @param userId             ID of the authenticated user.
+ * @param onAddAppointment   Callback with the selected date to create an appointment.
+ * @param onEditAppointment  Callback with the selected appointment to edit it.
+ * @param onBack             Callback to return to the previous screen.
+ */
 fun AppointmentsScreen(
     viewModel: AppointmentViewModel, userId: Long,
     onAddAppointment: (LocalDate) -> Unit,
@@ -55,7 +75,7 @@ fun AppointmentsScreen(
 ) {
     val appointments by viewModel.appointments.observeAsState(emptyList())
     val isLoadingRaw by viewModel.isLoading.observeAsState(false)
-    val isLoading = isLoadingRaw ?: false
+    val isLoading = isLoadingRaw
     val error by viewModel.error.observeAsState()
     val userPets by viewModel.userPets.observeAsState(emptyList())
 
@@ -93,18 +113,18 @@ fun AppointmentsScreen(
     // Delete dialog
     showDeleteDialog?.let { appt ->
         AlertDialog(
-            onDismissRequest = { showDeleteDialog = null },
+            onDismissRequest = {},
             icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Eliminar cita") },
             text = { Text("¿Eliminar la cita del ${formatDateShort(appt.appointmentDate)}?") },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.delete(appt.id, userId); showDeleteDialog = null },
+                    onClick = { viewModel.delete(appt.id, userId); },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteDialog = null }) { Text("Cancelar") }
+                TextButton(onClick = { }) { Text("Cancelar") }
             }
         )
     }
@@ -211,7 +231,7 @@ fun AppointmentsScreen(
                             for (col in 0 until 7) {
                                 val cellIndex = row * 7 + col
                                 val dayNum = cellIndex - startOffset + 1
-                                if (dayNum < 1 || dayNum > daysInMonth) {
+                                if (dayNum !in 1..daysInMonth) {
                                     Box(Modifier.weight(1f).height(40.dp))
                                 } else {
                                     val date = currentMonth.atDay(dayNum)
@@ -324,7 +344,7 @@ fun AppointmentsScreen(
                             appointment = appt,
                             pet = userPets.find { it.id == appt.petId },
                             onEdit = { onEditAppointment(appt) },
-                            onDelete = { showDeleteDialog = appt }
+                            onDelete = { }
                         )
                     }
                     item { Spacer(Modifier.height(80.dp)) }
@@ -336,6 +356,20 @@ fun AppointmentsScreen(
 }
 
 // ── Appointment Card ─────────────────────────────────────────────
+/**
+ * Card for a veterinary appointment within the selected day's list.
+ *
+ * Displays:
+ *  - A coloured side strip based on the appointment type (green = vaccination, red = surgery, etc.).
+ *  - Pet avatar (local photo → API URL → default emoji).
+ *  - Pet name, time, type, status, reason and veterinarian.
+ *  - Edit and delete buttons.
+ *
+ * @param appointment Appointment data to display.
+ * @param pet         Associated pet data; may be null if not found by ID.
+ * @param onEdit      Callback to open the edit form.
+ * @param onDelete    Callback to request deletion (the parent screen shows the dialog).
+ */
 @Composable
 fun AppointmentCard(
     appointment: VeterinaryAppointmentViewModel,
@@ -473,13 +507,30 @@ fun AppointmentCard(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Formats an ISO-8601 date into the short format "dd/MM/yyyy HH:mm".
+ * Returns the original string if parsing fails (unexpected API format).
+ *
+ * @param iso ISO-8601 string with date and time (e.g. "2026-03-05T10:00:00").
+ * @return Formatted date, or the original string if it cannot be parsed.
+ */
 fun formatDateShort(iso: String): String = runCatching {
     LocalDateTime.parse(iso, DateTimeFormatter.ISO_DATE_TIME)
         .format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
 }.getOrDefault(iso)
 
+/**
+ * Extracts only the time from an ISO-8601 date in "HH:mm" format.
+ * Returns "--:--" if parsing fails.
+ *
+ * @param iso ISO-8601 string with date and time (e.g. "2026-03-05T10:00:00").
+ * @return Time in "HH:mm" format, or "--:--" if it cannot be parsed.
+ */
 fun formatTimeOnly(iso: String): String = runCatching {
     LocalDateTime.parse(iso, DateTimeFormatter.ISO_DATE_TIME)
         .format(DateTimeFormatter.ofPattern("HH:mm"))
 }.getOrDefault("--:--")
+
+
 

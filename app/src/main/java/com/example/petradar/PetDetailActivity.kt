@@ -8,12 +8,35 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.petradar.ui.PetDetailScreen
 import com.example.petradar.ui.theme.PetRadarTheme
 import com.example.petradar.utils.AuthManager
+import com.example.petradar.utils.MedicationScheduler
+import com.example.petradar.utils.MedicationStore
+import com.example.petradar.utils.PetNameStore
+import com.example.petradar.utils.PetPhotoStore
 import com.example.petradar.viewmodel.PetDetailViewModel
 
+/**
+ * PetDetailActivity serves for both creating a new pet and editing an existing one.
+ *
+ * Edit mode   → [EXTRA_PET_ID] is provided with an id > 0.
+ *               The ViewModel loads the current data via GET /api/UserPets/{id}.
+ * Create mode → [EXTRA_USER_ID] is provided (or read from [AuthManager]).
+ *               The ViewModel builds a POST /api/UserPets request.
+ *
+ * Note on photos:
+ *  - The API (UserPetUpdateModel) does not expose a photo field.
+ *  - Photos are stored locally in [com.example.petradar.utils.PetPhotoStore]
+ *    using the petId as a key.
+ *  - For new pets the photo is re-associated the next time the user edits
+ *    the pet (when the petId returned by the API already exists).
+ *
+ * Delegates all UI to [PetDetailScreen] (Jetpack Compose).
+ */
 class PetDetailActivity : ComponentActivity() {
 
     companion object {
+        /** Extra holding the ID of the pet to edit. If not provided, creation mode is assumed. */
         const val EXTRA_PET_ID = "extra_pet_id"
+        /** Extra holding the owner user ID for a new pet (creation mode). */
         const val EXTRA_USER_ID = "extra_user_id"
     }
 
@@ -21,30 +44,79 @@ class PetDetailActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // Read Intent extras. petId == -1 indicates creation mode.
         val petId = intent.getLongExtra(EXTRA_PET_ID, -1L)
+        // Use the userId from the Intent; fall back to the saved session if missing.
         val userId = intent.getLongExtra(EXTRA_USER_ID, -1L)
             .let { if (it <= 0) AuthManager.getUserId(this) ?: -1L else it }
 
         val viewModel = ViewModelProvider(this)[PetDetailViewModel::class.java]
+        // Configure the ViewModel context so it knows whether to create or update.
         viewModel.currentPetId = petId
         viewModel.currentUserId = userId
 
+        // Only in edit mode do we load the existing pet data.
         if (petId > 0) viewModel.loadPet(petId)
 
-        // For NEW pets: once the pet is created the API returns 201 with no body,
-        // so we can't get the new ID here. The photo is already handled in the
-        // screen's save button for edit mode (currentPetId > 0).
-        // For creates, we observe the pet list in PetsActivity.onResume and match by name.
-        // As a simpler approach: store a "pending" URI tagged to userId+name in PetPhotoStore
-        // after success — handled inside PetDetailScreen's save action for the edit case.
-        // For new pets the photo will be re-associated when the user next edits that pet.
+        // Observe saveSuccess so we can schedule alarms once we know the pet ID.
+        // For new pets the petId is unknown until after the server responds;
+        // PetDetailViewModel.currentPetId is -1 on creation — we use the petId
+        // from edit mode directly.
+        viewModel.saveSuccess.observe(this) { success ->
+            if (!success) return@observe
+            val savedPetId = viewModel.currentPetId  // valid only in edit mode
+            if (savedPetId > 0) {
+                val petName = viewModel.pet.value?.name ?: ""
+                if (petName.isNotBlank()) PetNameStore.save(this, savedPetId, petName)
+                val reminders = MedicationStore.getAll(this, savedPetId)
+                MedicationScheduler.cancelAll(this, savedPetId)
+                reminders.filter { it.isActive }.forEach { reminder ->
+                    MedicationScheduler.schedule(this, savedPetId, petName, reminder)
+                }
+            }
+        }
+
+        // After creation the API returns no body, so we resolve the new pet's ID
+        // by re-fetching the list. Once we have it, persist the pending photo.
+        viewModel.createdPetId.observe(this) { newPetId ->
+            val uri = viewModel.pendingPhotoUri
+            if (newPetId != null && newPetId > 0 && !uri.isNullOrBlank()) {
+                PetPhotoStore.save(this, newPetId, uri)
+            }
+        }
+
+        viewModel.deleteSuccess.observe(this) { deleted ->
+            if (!deleted) return@observe
+            if (petId > 0) {
+                // Cancel all medication alarms for this pet
+                MedicationScheduler.cancelAll(this, petId)
+                // Remove all local data for this pet
+                MedicationStore.deleteAll(this, petId)
+                PetPhotoStore.delete(this, petId)
+                PetNameStore.remove(this, petId)
+            }
+            setResult(RESULT_OK)
+            finish()
+        }
 
         setContent {
             PetRadarTheme {
                 PetDetailScreen(
                     viewModel = viewModel,
                     isEditMode = petId > 0,
-                    onBack = { finish() }
+                    onBack = { finish() },
+                    onDelete = { viewModel.deletePet() },
+                    onSaveMedications = { reminders ->
+                        if (petId > 0) {
+                            val petName = viewModel.pet.value?.name ?: ""
+                            if (petName.isNotBlank()) PetNameStore.save(this, petId, petName)
+                            MedicationStore.saveAll(this, petId, reminders)
+                            MedicationScheduler.cancelAll(this, petId)
+                            reminders.filter { it.isActive }.forEach { reminder ->
+                                MedicationScheduler.schedule(this, petId, petName, reminder)
+                            }
+                        }
+                    }
                 )
             }
         }

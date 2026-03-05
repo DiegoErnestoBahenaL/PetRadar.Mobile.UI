@@ -6,16 +6,28 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-// Set of Material typography styles to start with
+/**
+ * PetRadar typography configuration for Material3.
+ *
+ * Only [Typography.bodyLarge] is customised explicitly;
+ * the remaining styles (`titleLarge`, `labelSmall`, etc.) use
+ * the default Material3 values.
+ *
+ * To customise more styles, uncomment the example blocks below
+ * and adjust the font family, size, etc.
+ *
+ * Passed to [androidx.compose.material3.MaterialTheme] in [PetRadarTheme].
+ */
 val Typography = Typography(
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
+        fontFamily   = FontFamily.Default, // System font (Roboto on Android)
+        fontWeight   = FontWeight.Normal,
+        fontSize     = 16.sp,
+        lineHeight   = 24.sp,
         letterSpacing = 0.5.sp
     )
-    /* Other default text styles to override
+    /* Examples of additional styles that can be customised:
+
     titleLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,

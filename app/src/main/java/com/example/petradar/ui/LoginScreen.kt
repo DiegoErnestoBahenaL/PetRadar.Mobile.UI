@@ -30,6 +30,24 @@ import androidx.compose.ui.unit.sp
 import com.example.petradar.R
 import com.example.petradar.viewmodel.LoginViewModel
 
+/**
+ * PetRadar sign-in screen.
+ *
+ * Contains:
+ *  - Logo and slogan animated with fade + slide on entry.
+ *  - Email field with format validation.
+ *  - Password field with visibility toggle.
+ *  - "Sign In" button that triggers [LoginViewModel.login].
+ *  - Link to the registration screen.
+ *  - Snackbar for displaying authentication errors.
+ *
+ * Validation is performed locally before calling the ViewModel, showing
+ * error messages below each invalid field.
+ *
+ * @param viewModel           ViewModel that executes the login and exposes the state.
+ * @param onLoginSuccess      Callback invoked when login succeeds; navigates to Home.
+ * @param onNavigateToRegister Callback to open [com.example.petradar.RegisterActivity].
+ */
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,

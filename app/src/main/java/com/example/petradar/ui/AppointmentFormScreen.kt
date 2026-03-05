@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.example.petradar.ui
 
 import androidx.compose.animation.AnimatedVisibility
@@ -13,10 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.ExposedDropdownMenuAnchorType.Companion.PrimaryNotEditable
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -40,8 +44,11 @@ fun AppointmentFormScreen(
     petId: Long,
     userId: Long,
     initialDate: LocalDate? = null,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** Called after a successful save with the appointment date-time and reminder preference. */
+    onAfterSave: ((appointmentDateTime: LocalDateTime, remindDayBefore: Boolean, petName: String, reason: String) -> Unit)? = null
 ) {
+    val isInPreview = LocalInspectionMode.current
     val selected by viewModel.selected.observeAsState()
     val isLoading = viewModel.isLoading.observeAsState(false).value
     val error by viewModel.error.observeAsState()
@@ -81,11 +88,14 @@ fun AppointmentFormScreen(
     var cost by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
 
+    // Notification preferences
+    var remindDayBefore by remember { mutableStateOf(false) }
+
     var typeError by remember { mutableStateOf<String?>(null) }
     var reasonError by remember { mutableStateOf<String?>(null) }
     var typeExpanded by remember { mutableStateOf(false) }
     var statusExpanded by remember { mutableStateOf(false) }
-    var visible by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(isInPreview) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val typeOptions = listOf(
@@ -136,7 +146,18 @@ fun AppointmentFormScreen(
     }
 
     LaunchedEffect(error) { error?.let { snackbarHostState.showSnackbar(it) } }
-    LaunchedEffect(saveSuccess) { if (saveSuccess) { viewModel.clearSaveSuccess(); onBack() } }
+    LaunchedEffect(saveSuccess) {
+        if (saveSuccess) {
+            viewModel.clearSaveSuccess()
+            onAfterSave?.invoke(
+                LocalDateTime.of(selectedDate, selectedTime),
+                remindDayBefore,
+                selectedPet?.name ?: "",
+                reason
+            )
+            onBack()
+        }
+    }
 
     fun buildIsoDateTime() =
         LocalDateTime.of(selectedDate, selectedTime)
@@ -220,9 +241,7 @@ fun AppointmentFormScreen(
             }
 
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 80)) + slideInVertically(tween(400, 80)) { 40 }) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                ) {
+                Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
                         ExposedDropdownMenuBox(expanded = petExpanded, onExpandedChange = { petExpanded = it }) {
@@ -239,7 +258,7 @@ fun AppointmentFormScreen(
                                 placeholder = { Text(if (userPets.isEmpty()) "Cargando mascotas…" else "Selecciona una mascota") },
                                 isError = petError != null,
                                 supportingText = petError?.let { e -> { Text(e) } },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(PrimaryNotEditable),
                                 enabled = !isLoading && userPets.isNotEmpty()
                             )
                             ExposedDropdownMenu(expanded = petExpanded, onDismissRequest = { petExpanded = false }) {
@@ -272,7 +291,7 @@ fun AppointmentFormScreen(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
                                 isError = typeError != null,
                                 supportingText = typeError?.let { e -> { Text(e) } },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(PrimaryNotEditable),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }) {
@@ -289,7 +308,7 @@ fun AppointmentFormScreen(
                                 label = { Text("Estado *") },
                                 leadingIcon = { Icon(Icons.Default.Info, null) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(statusExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(PrimaryNotEditable),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
@@ -377,14 +396,71 @@ fun AppointmentFormScreen(
                 }
             }
 
+            // ── Notification reminders ──────────────────────────────────────────
+            AnimatedVisibility(visible, enter = fadeIn(tween(400, 140)) + slideInVertically(tween(400, 140)) { 40 }) {
+                Text("Recordatorios", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 160)) + slideInVertically(tween(400, 160)) { 40 }) {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        // Always-on reminder — visual info only
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Notificación 1 hora antes (siempre activa)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        // Optional day-before reminder
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                Icons.Default.NotificationsActive,
+                                contentDescription = null,
+                                tint = if (remindDayBefore) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                "Recordarme un día antes",
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = remindDayBefore,
+                                onCheckedChange = { remindDayBefore = it },
+                                enabled = !isLoading
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Clinical notes ──────────────────────────────────────────────────
+            AnimatedVisibility(visible, enter = fadeIn(tween(400, 200)) + slideInVertically(tween(400, 200)) { 40 }) {
                 Text("Notas clínicas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
 
-            AnimatedVisibility(visible, enter = fadeIn(tween(400, 200)) + slideInVertically(tween(400, 200)) { 40 }) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                ) {
+            AnimatedVisibility(visible, enter = fadeIn(tween(400, 240)) + slideInVertically(tween(400, 240)) { 40 }) {
+                Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text("Notas") },
                             modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !isLoading)
@@ -400,7 +476,7 @@ fun AppointmentFormScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            AnimatedVisibility(visible, enter = fadeIn(tween(400, 280)) + slideInVertically(tween(400, 280)) { 60 }) {
+            AnimatedVisibility(visible, enter = fadeIn(tween(400, 300)) + slideInVertically(tween(400, 300)) { 60 }) {
                 Button(
                     onClick = {
                         if (!validate()) return@Button
