@@ -21,20 +21,48 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.petradar.ui.theme.PetAccent
 import com.example.petradar.ui.theme.PetTeal40
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Main screen of PetRadar after signing in.
+ *
+ * Structure:
+ *  - **TopAppBar** with the "PetRadar" name and a hamburger menu button.
+ *  - **ModalNavigationDrawer** with access to:
+ *    - Profile, Pets, Appointments, Reports (future), Settings (future) and Sign out.
+ *  - **Main content** with:
+ *    - Welcome card with the user's name.
+ *    - Quick-access cards for Pets and Appointments.
+ *    - Sections for upcoming features (Reports, Community).
+ *
+ * Uses [AnimatedVisibility] with fade+slide for a smooth entrance animation.
+ *
+ * @param userName              User's name for the greeting.
+ * @param userEmail             User's email for the drawer.
+ * @param onNavigateToProfile   Navigates to [com.example.petradar.ProfileActivity].
+ * @param onNavigateToPets      Navigates to [com.example.petradar.PetsActivity].
+ * @param onNavigateToAppointments Navigates to [com.example.petradar.AppointmentsActivity].
+ * @param onNavigateToAdoptions Navigates to [com.example.petradar.AdoptionAnimalsActivity].
+ * @param onLogout              Signs out and navigates to LoginActivity.
+ */
 fun HomeScreen(
     userName: String,
     userEmail: String,
+    profilePhotoUrl: String? = null,
     onNavigateToProfile: () -> Unit,
     onNavigateToPets: () -> Unit,
     onNavigateToAppointments: () -> Unit,
+    onNavigateToAdoptions: () -> Unit,
     onLogout: () -> Unit
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -64,12 +92,28 @@ fun HomeScreen(
                                 .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(40.dp)
-                            )
+                            if (!profilePhotoUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(profilePhotoUrl)
+                                        .crossfade(true)
+                                        .memoryCacheKey(profilePhotoUrl)
+                                        .diskCacheKey(profilePhotoUrl)
+                                        .build(),
+                                    contentDescription = "Foto de perfil",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -117,6 +161,17 @@ fun HomeScreen(
                     onClick = {
                         scope.launch { drawerState.close() }
                         onNavigateToAppointments()
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Pets, contentDescription = null) },
+                    label = { Text("Adopciones") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToAdoptions()
                     },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
@@ -198,12 +253,37 @@ fun HomeScreen(
                                 .padding(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Face,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(48.dp)
-                            )
+                            // Profile photo or fallback icon
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!profilePhotoUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(profilePhotoUrl)
+                                            .crossfade(true)
+                                            .memoryCacheKey(profilePhotoUrl)
+                                            .diskCacheKey(profilePhotoUrl)
+                                            .build(),
+                                        contentDescription = "Foto de perfil",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(56.dp)
+                                            .clip(CircleShape)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Face,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                            }
                             Spacer(Modifier.width(16.dp))
                             Column {
                                 Text(
@@ -273,11 +353,34 @@ fun HomeScreen(
                         onClick = onNavigateToAppointments
                     )
                 }
+
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(500, 400)) + slideInVertically(tween(500, 400)) { 60 }
+                ) {
+                    QuickAccessCard(
+                        icon = Icons.Default.Pets,
+                        title = "Adopciones",
+                        color = PetAccent,
+                        onClick = onNavigateToAdoptions
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * Quick-access card used in the home screen grid.
+ *
+ * Displays a themed icon and a descriptive title.
+ * Executes [onClick] when tapped.
+ *
+ * @param icon    Material icon representing the section.
+ * @param title   Section name to display.
+ * @param color   Primary icon color (should contrast with the Card background).
+ * @param onClick Callback executed when the card is tapped; navigates to the corresponding section.
+ */
 @Composable
 private fun QuickAccessCard(
     icon: ImageVector,

@@ -4,14 +4,15 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+@Suppress("DEPRECATION")
 android {
     namespace = "com.example.petradar"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.petradar"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -31,12 +32,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
         viewBinding = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
     }
 }
 
@@ -51,41 +55,41 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // AppCompat para Material Components
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.coordinatorlayout:coordinatorlayout:1.2.0")
-    implementation("androidx.drawerlayout:drawerlayout:1.2.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // AppCompat for Material Components
+    implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
+    implementation(libs.androidx.coordinatorlayout)
+    implementation(libs.androidx.drawerlayout)
+    implementation(libs.androidx.recyclerview)
 
-    // Retrofit para llamadas HTTP
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Retrofit for HTTP calls
+    implementation(libs.squareup.retrofit)
+    implementation(libs.squareup.retrofit.gson)
 
-    // OkHttp para logging
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // OkHttp for logging
+    implementation(libs.squareup.okhttp.logging)
 
-    // Coroutines para llamadas asíncronas
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    // Coroutines for asynchronous calls
+    implementation(libs.kotlinx.coroutines.android)
 
-    // ViewModel y LiveData
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.activity:activity-ktx:1.8.2")
+    // ViewModel and LiveData
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.activity.ktx)
 
     // Compose Animation
-    implementation("androidx.compose.animation:animation:1.6.4")
+    implementation(libs.androidx.compose.animation)
 
     // Compose Icons Extended
-    implementation("androidx.compose.material:material-icons-extended:1.6.4")
+    implementation(libs.androidx.compose.icons.extended)
 
     // Compose LiveData integration
-    implementation("androidx.compose.runtime:runtime-livedata:1.6.4")
+    implementation(libs.androidx.compose.runtime.livedata)
 
     // Coil — image loading for Compose
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

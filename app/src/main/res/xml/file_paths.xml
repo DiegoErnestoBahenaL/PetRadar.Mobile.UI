@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Directory used to store photos taken with the camera -->
+    <cache-path name="camera_photos" path="camera_photos/" />
+</paths>
+

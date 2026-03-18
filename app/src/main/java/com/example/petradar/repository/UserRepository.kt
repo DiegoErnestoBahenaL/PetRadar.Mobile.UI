@@ -3,36 +3,29 @@ package com.example.petradar.repository
 import com.example.petradar.api.RetrofitClient
 import com.example.petradar.api.models.UpdateProfileRequest
 import com.example.petradar.api.models.UserProfile
+import okhttp3.MultipartBody
 import retrofit2.Response
 
 class UserRepository {
 
     private val apiService = RetrofitClient.apiService
 
-    /**
-     * Obtener usuario por ID
-     * Endpoint: GET /api/Users/{id}
-     */
-    suspend fun getUserById(userId: Long): Response<UserProfile> {
-        return apiService.getUserById(userId)
-    }
+    suspend fun getUserById(userId: Long): Response<UserProfile> =
+        apiService.getUserById(userId)
+
+    suspend fun updateUser(userId: Long, request: UpdateProfileRequest): Response<Unit> =
+        apiService.updateUser(userId, request)
+
+    suspend fun getAllUsers(): Response<List<UserProfile>> =
+        apiService.getAllUsers()
 
     /**
-     * Actualizar usuario
-     * Endpoint: PUT /api/Users/{id}
+     * Uploads a profile picture for the given user.
+     * Endpoint: PUT /api/Users/{id}/profilepicture
+     *
+     * @param userId The user ID.
+     * @param filePart Multipart image part with name "file".
      */
-    suspend fun updateUser(userId: Long, request: UpdateProfileRequest): Response<Unit> {
-        return apiService.updateUser(userId, request)
-    }
-
-    /**
-     * Obtener todos los usuarios
-     * Endpoint: GET /api/Users
-     */
-    suspend fun getAllUsers(): Response<List<UserProfile>> {
-        return apiService.getAllUsers()
-    }
+    suspend fun uploadProfilePicture(userId: Long, filePart: MultipartBody.Part): Response<Unit> =
+        apiService.uploadProfilePicture(userId, filePart)
 }
-
-
-

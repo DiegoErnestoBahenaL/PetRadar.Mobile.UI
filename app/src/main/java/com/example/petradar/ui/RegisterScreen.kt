@@ -1,10 +1,18 @@
 package com.example.petradar.ui
 
+import android.Manifest
+import android.net.Uri
 import android.util.Patterns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -17,7 +25,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -26,15 +37,46 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.petradar.viewmodel.LoginViewModel
+import java.io.File
 
+/**
+ * New account registration screen for PetRadar.
+ *
+ * Contains two sections:
+ *  - **Personal data**: First name*, Last name*, Email*, Phone (optional).
+ *  - **Security**: Password*, Confirm password*, Privacy policy checkbox.
+ *
+ * Validation is performed locally before calling the ViewModel:
+ *  - Required fields must not be blank.
+ *  - Email must match a valid format.
+ *  - Password must be at least 6 characters.
+ *  - Passwords must match.
+ *  - Privacy policy checkbox must be checked.
+ *
+ * Calls [LoginViewModel.register] on submit; if successful (201 Created),
+ * the ViewModel stores the credentials and `RegisterActivity` triggers an automatic login.
+ *
+ * Note: In the QA environment POST /api/Users may require admin authentication.
+ * If it returns 401, an explanatory message is shown in the Snackbar.
+ *
+ * @param viewModel         ViewModel shared with LoginActivity to reuse the post-registration login.
+ * @param onRegisterSuccess Callback invoked after a successful post-registration login; navigates to Home.
+ * @param onBack            Callback to return to the login screen.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
     viewModel: LoginViewModel,
     onRegisterSuccess: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onPhotoSelected: (Uri) -> Unit = {}
 ) {
+    val context = LocalContext.current
     val isLoadingRaw by viewModel.isLoading.observeAsState(false)
     val isLoading = isLoadingRaw
     val errorMessage by viewModel.errorMessage.observeAsState()
@@ -57,6 +99,31 @@ fun RegisterScreen(
     var confirmPasswordError by remember { mutableStateOf<String?>(null) }
     var privacyError by remember { mutableStateOf(false) }
 
+    // Photo state
+    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoSheet by remember { mutableStateOf(false) }
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    fun createCameraUri(): Uri {
+        val photoDir = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+        val photoFile = File(photoDir, "profile_${System.currentTimeMillis()}.jpg")
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) { selectedPhotoUri = uri; onPhotoSelected(uri) }
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        if (success) { cameraImageUri?.let { selectedPhotoUri = it; onPhotoSelected(it) } }
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val uri = createCameraUri()
+            cameraImageUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
+
     var visible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -66,6 +133,36 @@ fun RegisterScreen(
     LaunchedEffect(errorMessage) {
         val msg = errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
+    }
+
+    // Photo source bottom sheet
+    if (showPhotoSheet) {
+        ModalBottomSheet(onDismissRequest = { }) {
+            Column(modifier = Modifier.padding(bottom = 32.dp)) {
+                Text("Foto de perfil", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                ListItem(
+                    headlineContent = { Text("Tomar foto") },
+                    leadingContent = { Icon(Icons.Default.CameraAlt, null) },
+                    modifier = Modifier.clickable {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                            == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            val uri = createCameraUri()
+                            cameraImageUri = uri
+                            cameraLauncher.launch(uri)
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("Elegir de la galería") },
+                    leadingContent = { Icon(Icons.Default.PhotoLibrary, null) },
+                    modifier = Modifier.clickable { galleryLauncher.launch("image/*") }
+                )
+            }
+        }
     }
 
     fun validate(): Boolean {
@@ -113,6 +210,69 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    // ── Profile photo (optional) ──────────────────────────
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            Box(
+                                modifier = Modifier
+                                    .size(88.dp)
+                                    .clip(CircleShape)
+                                    .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                    .clickable { showPhotoSheet = true },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (selectedPhotoUri != null) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(selectedPhotoUri)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "Foto seleccionada",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(44.dp),
+                                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(26.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary)
+                                    .clickable { },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.CameraAlt, null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(15.dp))
+                            }
+                        }
+                        Text(
+                            text = if (selectedPhotoUri != null) "Foto seleccionada ✓" else "Foto de perfil (opcional)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (selectedPhotoUri != null) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    HorizontalDivider()
                     Text("Datos personales", style = MaterialTheme.typography.titleMedium)
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
