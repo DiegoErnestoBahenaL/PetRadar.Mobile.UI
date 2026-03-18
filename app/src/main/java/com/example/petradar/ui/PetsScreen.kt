@@ -31,6 +31,25 @@ import com.example.petradar.viewmodel.PetViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Screen that displays the user's pet list.
+ *
+ * Features:
+ *  - Pet list in [LazyColumn] with photo (local or URL), name, species and sex.
+ *  - Floating action button "New pet" that navigates to the creation form.
+ *  - Pull-to-refresh to reload the list from the API.
+ *  - Confirmation dialog before deleting a pet.
+ *  - Snackbar for displaying network errors.
+ *
+ * Each pet's photo is resolved first from [PetPhotoStore] (local store)
+ * and, if not found, from the API's `photoURL` field.
+ *
+ * @param viewModel  ViewModel with the pet list and deletion logic.
+ * @param userId     User ID; used to reload the list on pull-to-refresh.
+ * @param onAddPet   Callback to navigate to create a new pet.
+ * @param onEditPet  Callback to navigate to edit the given pet.
+ * @param onBack     Callback to return to the previous screen.
+ */
 fun PetsScreen(
     viewModel: PetViewModel,
     userId: Long,
@@ -137,6 +156,7 @@ fun PetsScreen(
     }
 }
 
+/** Centred empty-state message shown when the user has no registered pets. */
 @Composable
 private fun EmptyPetsMessage(modifier: Modifier = Modifier) {
     Column(
@@ -164,6 +184,17 @@ private fun EmptyPetsMessage(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Card for an individual pet within the list.
+ *
+ * Displays the avatar (local photo → API URL → default emoji),
+ * the name, species/breed and sex of the pet.
+ * Includes edit (pencil) and delete (trash) buttons.
+ *
+ * @param pet      Pet data to display.
+ * @param onEdit   Callback to start editing this pet.
+ * @param onDelete Callback to request deletion (the parent screen shows the dialog).
+ */
 @Composable
 private fun PetCard(
     pet: UserPetViewModel,
@@ -184,10 +215,9 @@ private fun PetCard(
     val speciesEmoji = if (pet.species?.lowercase() == "cat") "🐱" else "🐶"
     val petBreed = pet.breed?.takeIf { it.isNotBlank() } ?: "Raza no especificada"
 
-    // Resolve photo: local store first, then API URL
-    val photoUriStr = remember(pet.id) {
-        PetPhotoStore.get(context, pet.id) ?: pet.photoURL?.takeIf { it.isNotBlank() }
-    }
+    // Resolve photo: local store first, then API URL.
+    // Not wrapped in remember() so it always reflects the latest stored value.
+    val photoUriStr = PetPhotoStore.get(context, pet.id) ?: pet.photoURL?.takeIf { it.isNotBlank() }
 
     Card(
         modifier = Modifier.fillMaxWidth(),

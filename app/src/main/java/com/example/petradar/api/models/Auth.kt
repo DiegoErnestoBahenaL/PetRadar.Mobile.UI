@@ -3,7 +3,22 @@ package com.example.petradar.api.models
 import com.google.gson.annotations.SerializedName
 
 /**
- * Modelo para la petición de login (LoginModel en Swagger)
+ * Data models related to user authentication.
+ *
+ * Each class maps directly to a schema defined in the PetRadar Swagger:
+ *  - [LoginRequest]        → LoginModel
+ *  - [LoginResponse]       → UserTokenViewModel
+ *  - [RefreshTokenRequest] → RefreshTokenFromUiModel
+ *  - [RegisterRequest]     → UserCreateModel
+ *  - [ApiError]            → ProblemDetails
+ */
+
+/**
+ * Request body for signing in.
+ * Maps to `LoginModel` in the Swagger.
+ *
+ * @property username User's email (used as the username in PetRadar).
+ * @property password Plain-text password; transmission is encrypted via HTTPS.
  */
 data class LoginRequest(
     @SerializedName("username")
@@ -14,7 +29,13 @@ data class LoginRequest(
 )
 
 /**
- * Modelo para la respuesta de login (UserTokenViewModel en Swagger)
+ * Server response on successful sign-in.
+ * Maps to `UserTokenViewModel` in the Swagger.
+ *
+ * @property token                Short-lived JWT used to authenticate requests.
+ * @property tokenValidTo         JWT expiry date/time (ISO-8601).
+ * @property refreshToken         Long-lived token used to renew the JWT without re-login.
+ * @property refreshTokenExpiryTime Refresh token expiry date/time (ISO-8601).
  */
 data class LoginResponse(
     @SerializedName("token")
@@ -31,7 +52,10 @@ data class LoginResponse(
 )
 
 /**
- * Modelo para refrescar token (RefreshTokenFromUiModel en Swagger)
+ * Request body for renewing the JWT using the refresh token.
+ * Maps to `RefreshTokenFromUiModel` in the Swagger.
+ *
+ * @property refreshToken The previously saved refresh token.
  */
 data class RefreshTokenRequest(
     @SerializedName("refreshToken")
@@ -39,7 +63,18 @@ data class RefreshTokenRequest(
 )
 
 /**
- * Modelo para la petición de registro (UserCreateModel en Swagger)
+ * Request body for registering a new user.
+ * Maps to `UserCreateModel` in the Swagger.
+ *
+ * @property email             Unique user email (required).
+ * @property password          Password (required; minimum length enforced by the server).
+ * @property name              User first name (required).
+ * @property lastName          Last name (optional).
+ * @property phoneNumber       Contact phone number (optional).
+ * @property organizationName  Organization name if applicable (optional).
+ * @property organizationAddress Organization address (optional).
+ * @property organizationPhone Organization phone number (optional).
+ * @property role              User role; defaults to "User" for normal registrations.
  */
 data class RegisterRequest(
     @SerializedName("email")
@@ -66,12 +101,20 @@ data class RegisterRequest(
     @SerializedName("organizationPhone")
     val organizationPhone: String? = null,
 
+    /** Role assigned to the new user. Regular users always use "User". */
     @SerializedName("role")
     val role: String = "User"
 )
 
 /**
- * Modelo genérico para respuestas de error (ProblemDetails en Swagger)
+ * Error structure returned by the API for 4xx/5xx responses.
+ * Maps to `ProblemDetails` in the Swagger (RFC 7807).
+ *
+ * @property type     URI reference to the problem type (e.g. RFC 9110).
+ * @property title    Short description of the error (e.g. "Unauthorized").
+ * @property status   HTTP status code.
+ * @property detail   Detailed description of the error (may be null).
+ * @property instance URI of the specific problem instance (may be null).
  */
 data class ApiError(
     @SerializedName("type")
@@ -89,6 +132,4 @@ data class ApiError(
     @SerializedName("instance")
     val instance: String?
 )
-
-
 

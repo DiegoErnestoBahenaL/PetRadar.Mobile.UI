@@ -1,5 +1,7 @@
 package com.example.petradar.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,45 +29,178 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.petradar.utils.MedicationReminder
+import com.example.petradar.utils.MedicationStore
 import com.example.petradar.utils.PetPhotoStore
 import com.example.petradar.viewmodel.PetDetailViewModel
 import androidx.core.net.toUri
+import java.io.File
+import androidx.compose.ui.tooling.preview.Preview
+import com.example.petradar.ui.theme.PetRadarTheme
+import com.example.petradar.api.UserPetViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
+/**
+ * Form for creating or editing a pet.
+ *
+ * In **edit mode** ([isEditMode] = true):
+ *  - Pre-fills fields with data loaded in [PetDetailViewModel.pet].
+ *  - Shows the locally saved photo from [PetPhotoStore] if available.
+ *  - On save calls PUT /api/UserPets/{id}.
+ *
+ * In **create mode** ([isEditMode] = false):
+ *  - All fields start empty.
+ *  - On save calls POST /api/UserPets.
+ *
+ * Form fields:
+ *  - Name (required), Species (required), Sex, Size, Breed, Color,
+ *    Date of birth, Weight, Description, Allergies, Medical notes, Neutered.
+ *
+ * Pet photo:
+ *  - The user can pick an image from the gallery.
+ *  - The photo is saved locally in [PetPhotoStore] after a successful save
+ *    (the API does not support image uploads via this endpoint).
+ *
+ * When [PetDetailViewModel.saveSuccess] is true, closes the screen.
+ *
+ * @param viewModel  ViewModel with the pet data and CRUD operations.
+ * @param isEditMode true = editing an existing pet; false = creating a new one.
+ * @param onBack     Callback to close the form.
+ */
 fun PetDetailScreen(
     viewModel: PetDetailViewModel,
     isEditMode: Boolean,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSaveMedications: ((List<MedicationReminder>) -> Unit)? = null,
+    onDelete: (() -> Unit)? = null
+) {
+    val petData by viewModel.pet.observeAsState()
+    val isLoading by viewModel.isLoading.observeAsState(false)
+    val errorMessage by viewModel.errorMessage.observeAsState()
+    val saveSuccess by viewModel.saveSuccess.observeAsState(false)
+
+    PetDetailContent(
+        petData = petData,
+        isLoading = isLoading,
+        errorMessage = errorMessage,
+        saveSuccess = saveSuccess,
+        isEditMode = isEditMode,
+        currentPetId = viewModel.currentPetId,
+        onBack = onBack,
+        onDelete = if (isEditMode && onDelete != null) onDelete else null,
+        onSaveMedications = onSaveMedications,
+        onSave = { name, speciesValue, breed, color, sexValue, sizeValue, birthDate, weight, description, isNeutered, allergies, medicalNotes, photoUri ->
+            viewModel.savePet(
+                name = name,
+                speciesValue = speciesValue,
+                breed = breed,
+                color = color,
+                sexValue = sexValue,
+                sizeValue = sizeValue,
+                birthDate = birthDate,
+                weight = weight,
+                description = description,
+                isNeutered = isNeutered,
+                allergies = allergies,
+                medicalNotes = medicalNotes,
+                photoUri = photoUri
+            )
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PetDetailContent(
+    petData: UserPetViewModel?,
+    isLoading: Boolean,
+    errorMessage: String?,
+    saveSuccess: Boolean,
+    isEditMode: Boolean,
+    currentPetId: Long,
+    onBack: () -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onSaveMedications: ((List<MedicationReminder>) -> Unit)? = null,
+    onSave: (
+        name: String, speciesValue: String, breed: String?, color: String?,
+        sexValue: String?, sizeValue: String?, birthDate: String?,
+        weight: Double?, description: String?, isNeutered: Boolean,
+        allergies: String?, medicalNotes: String?,
+        photoUri: String?
+    ) -> Unit
 ) {
     val context = LocalContext.current
-    val petData by viewModel.pet.observeAsState()
-    val isLoadingRaw by viewModel.isLoading.observeAsState(false)
-    val isLoading = isLoadingRaw
-    val errorMessage by viewModel.errorMessage.observeAsState()
-    val saveSuccessRaw by viewModel.saveSuccess.observeAsState(false)
-    val saveSuccess = saveSuccessRaw
-
+    val isInPreview = LocalInspectionMode.current
     val snackbarHostState = remember { SnackbarHostState() }
-    var visible by remember { mutableStateOf(false) }
+    var visible by remember { mutableStateOf(isInPreview) }
 
     var photoUri by remember {
         mutableStateOf<Uri?>(
-            if (isEditMode && viewModel.currentPetId > 0)
-                PetPhotoStore.get(context, viewModel.currentPetId)?.toUri()
+            if (!isInPreview && isEditMode && currentPetId > 0)
+                PetPhotoStore.get(context, currentPetId)?.toUri()
             else null
         )
     }
 
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? -> if (uri != null) photoUri = uri }
+    // Temporary file URI for camera captures
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoSourceDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // Activity result launchers are not available in preview mode.
+    // Guard them with isInPreview to prevent render crashes.
+    val galleryLauncher = if (!isInPreview) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? -> if (uri != null) photoUri = uri }
+    } else null
+
+    val cameraLauncher = if (!isInPreview) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.TakePicture()
+        ) { success: Boolean ->
+            if (success && cameraImageUri != null) {
+                photoUri = cameraImageUri
+            }
+        }
+    } else null
+
+    val cameraPermissionLauncher = if (!isInPreview) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted: Boolean ->
+            if (granted) {
+                val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                    .let { File(it, "pet_${System.currentTimeMillis()}.jpg") }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+                cameraImageUri = uri
+                cameraLauncher?.launch(uri)
+            }
+        }
+    } else null
+
+    /** Launches the camera, requesting permission first if needed. */
+    fun launchCamera() {
+        if (isInPreview) return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "pet_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            cameraLauncher?.launch(uri)
+        } else {
+            cameraPermissionLauncher?.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     var petName by remember { mutableStateOf("") }
     var speciesLabel by remember { mutableStateOf("") }
@@ -88,6 +223,15 @@ fun PetDetailScreen(
     var speciesExpanded by remember { mutableStateOf(false) }
     var sexExpanded by remember { mutableStateOf(false) }
     var sizeExpanded by remember { mutableStateOf(false) }
+
+    // Medication reminders – loaded from local store in edit mode
+    var medicationReminders by remember {
+        mutableStateOf<List<MedicationReminder>>(
+            if (!isInPreview && isEditMode && currentPetId > 0)
+                MedicationStore.getAll(context, currentPetId)
+            else emptyList()
+        )
+    }
 
     val speciesOptions = listOf("Perro" to "Dog", "Gato" to "Cat")
     val sexOptions = listOf("Macho" to "Male", "Hembra" to "Female", "Desconocido" to "Unknown")
@@ -138,6 +282,76 @@ fun PetDetailScreen(
         if (saveSuccess) onBack()
     }
 
+    // Photo source dialog (Gallery vs Camera)
+    if (showPhotoSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhotoSourceDialog = false },
+            icon = { Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Agregar foto") },
+            text = { Text("¿Cómo deseas agregar la foto?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPhotoSourceDialog = false
+                    launchCamera()
+                }) {
+                    Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Cámara")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPhotoSourceDialog = false
+                    galleryLauncher?.launch("image/*")
+                }) {
+                    Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Galería")
+                }
+            }
+        )
+    }
+
+    // Delete confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = { Text("Eliminar mascota") },
+            text = {
+                Text(
+                    "¿Estás seguro de que deseas eliminar a ${petData?.name ?: "esta mascota"}? " +
+                    "Esta acción no se puede deshacer."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete?.invoke()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    enabled = !isLoading
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -149,6 +363,20 @@ fun PetDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },
+                actions = {
+                    if (isEditMode && onDelete != null) {
+                        IconButton(
+                            onClick = { showDeleteDialog = true },
+                            enabled = !isLoading
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Eliminar mascota",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -173,7 +401,7 @@ fun PetDetailScreen(
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                             .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), CircleShape)
-                            .clickable { photoPickerLauncher.launch("image/*") },
+                            .clickable { showPhotoSourceDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         if (photoUri != null) {
@@ -317,6 +545,14 @@ fun PetDetailScreen(
                 }
             }
 
+            // ── Medication reminders ──────────────────────────────────────────
+            MedicationSection(
+                reminders = medicationReminders,
+                onRemindersChanged = { medicationReminders = it },
+                isLoading = isLoading,
+                visible = visible
+            )
+
             Spacer(Modifier.height(8.dp))
 
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 350)) + slideInVertically(tween(400, 350)) { 60 }) {
@@ -325,22 +561,26 @@ fun PetDetailScreen(
                         if (petName.isBlank()) { nameError = "El nombre es requerido"; return@Button }
                         if (speciesValue.isBlank()) { speciesError = "Selecciona la especie"; return@Button }
 
-                        val currentId = viewModel.currentPetId
                         if (photoUri != null) {
-                            if (currentId > 0) PetPhotoStore.save(context, currentId, photoUri.toString())
-                        } else if (currentId > 0) {
-                            PetPhotoStore.delete(context, currentId)
+                            if (currentPetId > 0) PetPhotoStore.save(context, currentPetId, photoUri.toString())
+                        } else if (currentPetId > 0) {
+                            PetPhotoStore.delete(context, currentPetId)
                         }
 
-                        viewModel.savePet(
-                            name = petName.trim(), speciesValue = speciesValue,
-                            breed = petBreed.trim().ifEmpty { null }, color = petColor.trim().ifEmpty { null },
-                            sexValue = sexValue.ifEmpty { null }, sizeValue = sizeValue.ifEmpty { null },
-                            birthDate = birthDate.trim().ifEmpty { null }, weight = petWeight.trim().toDoubleOrNull(),
-                            description = petDescription.trim().ifEmpty { null }, isNeutered = isNeutered,
-                            allergies = petAllergies.trim().ifEmpty { null },
-                            medicalNotes = medicalNotes.trim().ifEmpty { null },
-                            photoUri = photoUri?.toString()
+                        // Persist medication reminders locally before the API call
+                        if (currentPetId > 0) {
+                            onSaveMedications?.invoke(medicationReminders)
+                        }
+
+                        onSave(
+                            petName.trim(), speciesValue,
+                            petBreed.trim().ifEmpty { null }, petColor.trim().ifEmpty { null },
+                            sexValue.ifEmpty { null }, sizeValue.ifEmpty { null },
+                            birthDate.trim().ifEmpty { null }, petWeight.trim().toDoubleOrNull(),
+                            petDescription.trim().ifEmpty { null }, isNeutered,
+                            petAllergies.trim().ifEmpty { null },
+                            medicalNotes.trim().ifEmpty { null },
+                            photoUri?.toString()
                         )
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -359,5 +599,58 @@ fun PetDetailScreen(
 
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PetDetailScreenCreatePreview() {
+    PetRadarTheme {
+        PetDetailContent(
+            petData = null,
+            isLoading = false,
+            errorMessage = null,
+            saveSuccess = false,
+            isEditMode = false,
+            currentPetId = -1L,
+            onBack = {},
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PetDetailScreenEditPreview() {
+    val samplePet = UserPetViewModel(
+        id = 1L,
+        userId = 1L,
+        name = "Luna",
+        species = "Dog",
+        breed = "Golden Retriever",
+        color = "Dorado",
+        sex = "Female",
+        size = "Large",
+        birthDate = "2020-05-15",
+        approximateAge = 3.5,
+        weight = 25.0,
+        description = "Una perra muy amigable.",
+        photoURL = null,
+        additionalPhotosURL = null,
+        isNeutered = true,
+        allergies = "Ninguna",
+        medicalNotes = "Vacunas al día"
+    )
+    PetRadarTheme {
+        PetDetailContent(
+            petData = samplePet,
+            isLoading = false,
+            errorMessage = null,
+            saveSuccess = false,
+            isEditMode = true,
+            currentPetId = 1L,
+            onBack = {},
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+        )
     }
 }

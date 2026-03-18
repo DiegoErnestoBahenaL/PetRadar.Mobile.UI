@@ -3,7 +3,27 @@ package com.example.petradar.api.models
 import com.google.gson.annotations.SerializedName
 
 /**
- * Modelo de usuario (UserViewModel en Swagger)
+ * Data models related to the user profile.
+ *
+ * Each class maps directly to a schema in the PetRadar Swagger:
+ *  - [UserProfile]          → UserViewModel  (read)
+ *  - [UpdateProfileRequest] → UserUpdateModel (write / partial update)
+ */
+
+/**
+ * Full user profile data returned by GET /api/Users/{id}.
+ * Maps to `UserViewModel` in the Swagger.
+ *
+ * @property id                  Unique user ID in the database.
+ * @property email               Email address (also used as the username for login).
+ * @property name                User first name.
+ * @property lastName            Last name (may be null).
+ * @property phoneNumber         Contact phone number (may be null).
+ * @property profilePhotoURL     URL of the profile photo stored on the server (may be null).
+ * @property role                User role: SuperAdmin | Admin | User | Organization | NotSet.
+ * @property organizationName    Organization name if the user belongs to one (may be null).
+ * @property organizationAddress Organization address (may be null).
+ * @property organizationPhone   Organization phone number (may be null).
  */
 data class UserProfile(
     @SerializedName("id")
@@ -34,11 +54,28 @@ data class UserProfile(
     val organizationAddress: String? = null,
 
     @SerializedName("organizationPhone")
-    val organizationPhone: String? = null
+    val organizationPhone: String? = null,
+
+    @SerializedName("emailVerified")
+    val emailVerified: Boolean = false
 )
 
 /**
- * Modelo para actualizar usuario (UserUpdateModel en Swagger)
+ * Request body for updating a user's profile.
+ * Maps to `UserUpdateModel` in the Swagger.
+ *
+ * All fields are optional (nullable). The server only updates the fields
+ * that have a non-null value in the sent body.
+ *
+ * @property email             New email (optional).
+ * @property password          New password (optional; never read back from the server).
+ * @property name              New first name (optional).
+ * @property lastName          New last name (optional).
+ * @property phoneNumber       New phone number (optional).
+ * @property organizationName  New organization name (optional).
+ * @property organizationAddress New organization address (optional).
+ * @property organizationPhone New organization phone number (optional).
+ * @property role              New role (only admins should change this).
  */
 data class UpdateProfileRequest(
     @SerializedName("email")
@@ -68,6 +105,3 @@ data class UpdateProfileRequest(
     @SerializedName("role")
     val role: String? = null
 )
-
-
-
