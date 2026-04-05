@@ -55,6 +55,7 @@ fun PetsScreen(
     userId: Long,
     onAddPet: () -> Unit,
     onEditPet: (UserPetViewModel) -> Unit,
+    onReportLost: (UserPetViewModel) -> Unit,
     onBack: () -> Unit
 ) {
     val pets by viewModel.pets.observeAsState(emptyList())
@@ -144,6 +145,7 @@ fun PetsScreen(
                                 PetCard(
                                     pet = pet,
                                     onEdit = { onEditPet(pet) },
+                                    onReportLost = { onReportLost(pet) },
                                     onDelete = { petToDelete = pet; }
                                 )
                             }
@@ -199,6 +201,7 @@ private fun EmptyPetsMessage(modifier: Modifier = Modifier) {
 private fun PetCard(
     pet: UserPetViewModel,
     onEdit: () -> Unit,
+    onReportLost: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
@@ -255,6 +258,9 @@ private fun PetCard(
             Column {
                 IconButton(onClick = onEdit) {
                     Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                }
+                IconButton(onClick = onReportLost) {
+                    Icon(Icons.Default.Report, contentDescription = "Reportar perdida", tint = MaterialTheme.colorScheme.error)
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)

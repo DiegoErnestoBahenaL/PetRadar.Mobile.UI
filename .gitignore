@@ -1,3 +1,37 @@
+# Android Studio and Gradle
+.gradle/
+.idea/
+.DS_Store
+/build/
+/app/build/
+local.properties
+gradle-app.setting
+.gradletasknamecache
+.gradle/wrapper/
+
+# IntelliJ IDEA
+*.iml
+*.iws
+*.ipr
+out/
+*.apk
+*.ap_
+*.dex
+
+# Android Studio
+*.jks
+*.keystore
+captures/
+.externalNativeBuild
+.cxx
+
+# Generated files
+bin/
+gen/
+.classpath
+.project
+.settings/
+
 # Compiled class file
 *.class
 
@@ -10,7 +44,7 @@
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
 
-# Package Files #
+# Package Files
 *.jar
 *.war
 *.nar
@@ -19,9 +53,82 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Virtual machine crash logs
 hs_err_pid*
 replay_pid*
 
-# Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
+# Kotlin Gradle plugin data
 .kotlin/
+
+# Environment files
+.env
+.env.local
+
+# OS files
+Thumbs.db
+
+# Gradle wrapper files (optional, uncomment if using checked-in wrapper)
+# gradle-wrapper.jar
+# gradle-wrapper.properties
+
+# App internal storage (for development/testing)
+/app/files/
+
+# SharedPreferences and databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-journal
+/app/shared_prefs/
+
+# Sensitive configuration files (if used)
+secrets.properties
+firebase.json
+
+# Credentials and keys (should never be committed)
+*.p8
+*.p12
+*.pfx
+*.key
+*.pem
+*.crt
+**/secrets/**
+**/credentials/**
+
+# OAuth tokens and credentials
+**/cached_auth_tokens
+**/access_tokens
+
+# Cache directories
+.cache/
+**/cache/
+/app/cache/
+
+# Crash logs and diagnostics
+crash_log/
+crash_logs/
+
+# IDE temporary files
+*.swp
+*.swo
+*~
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Backup files
+*.bak
+*.backup
+
+# Misc
+.directory
+.c9/
+*.launch
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+

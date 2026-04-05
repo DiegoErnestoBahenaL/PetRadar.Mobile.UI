@@ -1,12 +1,18 @@
 ﻿package com.example.petradar.viewmodel
+import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.net.toUri
 import com.example.petradar.api.UserPetCreateModel
 import com.example.petradar.api.UserPetUpdateModel
 import com.example.petradar.api.UserPetViewModel
 import com.example.petradar.repository.PetRepository
+import com.example.petradar.utils.PetPhotoStore
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.launch
 class PetDetailViewModel : ViewModel() {
     private val repository = PetRepository()
@@ -30,12 +36,14 @@ class PetDetailViewModel : ViewModel() {
     var pendingPhotoUri: String? = null
     var currentPetId: Long = -1L
     var currentUserId: Long = -1L
+
     fun savePet(
         name: String, speciesValue: String, breed: String?, color: String?,
         sexValue: String?, sizeValue: String?, birthDate: String?,
         weight: Double?, description: String?, isNeutered: Boolean,
         allergies: String?, medicalNotes: String?,
-        photoUri: String? = null
+        photoUri: String? = null,
+        context: Context
     ) {
         pendingPhotoUri = photoUri
         if (currentPetId > 0) {
@@ -43,17 +51,24 @@ class PetDetailViewModel : ViewModel() {
                 petId = currentPetId, name = name, species = speciesValue,
                 breed = breed, color = color, sex = sexValue, size = sizeValue,
                 birthDate = birthDate, weight = weight, description = description,
-                isNeutered = isNeutered, allergies = allergies, medicalNotes = medicalNotes
+                isNeutered = isNeutered,
+                allergies = allergies,
+                medicalNotes = medicalNotes,
+                photoUri = photoUri, context = context
             )
         } else {
             createPet(
                 userId = currentUserId, name = name, species = speciesValue,
                 breed = breed, color = color, sex = sexValue, size = sizeValue,
                 birthDate = birthDate, weight = weight, description = description,
-                isNeutered = isNeutered, allergies = allergies, medicalNotes = medicalNotes
+                isNeutered = isNeutered,
+                allergies = allergies,
+                medicalNotes = medicalNotes,
+                photoUri = photoUri, context = context
             )
         }
     }
+
     fun loadPet(petId: Long) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -72,11 +87,14 @@ class PetDetailViewModel : ViewModel() {
             }
         }
     }
+
     fun createPet(
         userId: Long, name: String, species: String, breed: String?,
         color: String?, sex: String?, size: String?, birthDate: String?,
         weight: Double?, description: String?, isNeutered: Boolean?,
-        allergies: String?, medicalNotes: String?
+        allergies: String?, medicalNotes: String?,
+        photoUri: String? = null,
+        context: Context
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -91,8 +109,15 @@ class PetDetailViewModel : ViewModel() {
                 )
                 val response = repository.createPet(request)
                 if (response.isSuccessful) {
-                    // API returns 201 with no body – fetch the list to find the new pet ID
-                    resolveCreatedPetId(userId, name)
+                    val createdPetId = resolveCreatedPetId(userId, name)
+                    if (!photoUri.isNullOrBlank() && createdPetId != null) {
+                        try {
+                            PetPhotoStore.save(context, createdPetId, photoUri)
+                            uploadPetMainPicture(createdPetId, photoUri, context)
+                        } catch (e: Exception) {
+                            _errorMessage.value = "Pet created successfully, but photo upload failed: ${e.message}"
+                        }
+                    }
                     _saveSuccess.value = true
                 } else {
                     _errorMessage.value = "Error creating pet: ${response.code()}"
@@ -104,11 +129,8 @@ class PetDetailViewModel : ViewModel() {
             }
         }
     }
-    /**
-     * Fetches the user's pet list and emits the ID of the newest pet
-     * whose name matches [name] via [createdPetId].
-     */
-    private suspend fun resolveCreatedPetId(userId: Long, name: String) {
+
+    private suspend fun resolveCreatedPetId(userId: Long, name: String): Long? {
         try {
             val response = repository.getPetsByUserId(userId)
             if (response.isSuccessful) {
@@ -116,14 +138,19 @@ class PetDetailViewModel : ViewModel() {
                     ?.filter { it.name.equals(name, ignoreCase = true) }
                     ?.maxByOrNull { it.id }
                 _createdPetId.value = newPet?.id
+                return newPet?.id
             }
-        } catch (_: Exception) { /* non-fatal – photo just won't be saved */ }
+        } catch (_: Exception) { }
+        return null
     }
+
     fun updatePet(
         petId: Long, name: String?, species: String?, breed: String?,
         color: String?, sex: String?, size: String?, birthDate: String?,
         weight: Double?, description: String?, isNeutered: Boolean?,
-        allergies: String?, medicalNotes: String?
+        allergies: String?, medicalNotes: String?,
+        photoUri: String? = null,
+        context: Context
     ) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -138,6 +165,14 @@ class PetDetailViewModel : ViewModel() {
                 )
                 val response = repository.updatePet(petId, request)
                 if (response.isSuccessful) {
+                    if (!photoUri.isNullOrBlank()) {
+                        try {
+                            PetPhotoStore.save(context, petId, photoUri)
+                            uploadPetMainPicture(petId, photoUri, context)
+                        } catch (e: Exception) {
+                            _errorMessage.value = "Pet updated, but photo upload failed: ${e.message}"
+                        }
+                    }
                     _saveSuccess.value = true
                     loadPet(petId)
                 } else {
@@ -150,6 +185,7 @@ class PetDetailViewModel : ViewModel() {
             }
         }
     }
+
     fun deletePet() {
         val petId = currentPetId
         if (petId <= 0) return
@@ -168,6 +204,30 @@ class PetDetailViewModel : ViewModel() {
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context) {
+        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
+
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val extension = when {
+            mimeType.contains("png", ignoreCase = true) -> "png"
+            mimeType.contains("webp", ignoreCase = true) -> "webp"
+            else -> "jpg"
+        }
+
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+        val filePart = MultipartBody.Part.createFormData(
+            name = "file",
+            filename = "pet_main.$extension",
+            body = requestBody
+        )
+
+        val response = repository.uploadPetMainPicture(petId, filePart)
+        if (!response.isSuccessful) {
+            _errorMessage.value = "Error uploading photo (${response.code()})"
         }
     }
 }

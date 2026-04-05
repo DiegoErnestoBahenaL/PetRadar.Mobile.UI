@@ -81,7 +81,8 @@ fun PetDetailScreen(
     isEditMode: Boolean,
     onBack: () -> Unit,
     onSaveMedications: ((List<MedicationReminder>) -> Unit)? = null,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onReportLost: (() -> Unit)? = null
 ) {
     val petData by viewModel.pet.observeAsState()
     val isLoading by viewModel.isLoading.observeAsState(false)
@@ -97,8 +98,9 @@ fun PetDetailScreen(
         currentPetId = viewModel.currentPetId,
         onBack = onBack,
         onDelete = if (isEditMode && onDelete != null) onDelete else null,
+        onReportLost = if (isEditMode && onReportLost != null) onReportLost else null,
         onSaveMedications = onSaveMedications,
-        onSave = { name, speciesValue, breed, color, sexValue, sizeValue, birthDate, weight, description, isNeutered, allergies, medicalNotes, photoUri ->
+        onSave = { name, speciesValue, breed, color, sexValue, sizeValue, birthDate, weight, description, isNeutered, allergies, medicalNotes, photoUri, context ->
             viewModel.savePet(
                 name = name,
                 speciesValue = speciesValue,
@@ -112,7 +114,8 @@ fun PetDetailScreen(
                 isNeutered = isNeutered,
                 allergies = allergies,
                 medicalNotes = medicalNotes,
-                photoUri = photoUri
+                photoUri = photoUri,
+                context = context
             )
         }
     )
@@ -129,13 +132,15 @@ fun PetDetailContent(
     currentPetId: Long,
     onBack: () -> Unit,
     onDelete: (() -> Unit)? = null,
+    onReportLost: (() -> Unit)? = null,
     onSaveMedications: ((List<MedicationReminder>) -> Unit)? = null,
     onSave: (
         name: String, speciesValue: String, breed: String?, color: String?,
         sexValue: String?, sizeValue: String?, birthDate: String?,
         weight: Double?, description: String?, isNeutered: Boolean,
         allergies: String?, medicalNotes: String?,
-        photoUri: String?
+        photoUri: String?,
+        context: android.content.Context
     ) -> Unit
 ) {
     val context = LocalContext.current
@@ -282,7 +287,6 @@ fun PetDetailContent(
         if (saveSuccess) onBack()
     }
 
-    // Photo source dialog (Gallery vs Camera)
     if (showPhotoSourceDialog) {
         AlertDialog(
             onDismissRequest = { showPhotoSourceDialog = false },
@@ -312,7 +316,6 @@ fun PetDetailContent(
         )
     }
 
-    // Delete confirmation dialog
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -466,7 +469,7 @@ fun PetDetailContent(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(speciesExpanded) },
                                 isError = speciesError != null,
                                 supportingText = speciesError?.let { err -> { Text(err) } },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = speciesExpanded, onDismissRequest = { speciesExpanded = false }) {
@@ -483,7 +486,7 @@ fun PetDetailContent(
                         ExposedDropdownMenuBox(expanded = sexExpanded, onExpandedChange = { sexExpanded = it }) {
                             OutlinedTextField(value = sexLabel, onValueChange = {}, readOnly = true, label = { Text("Sexo") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sexExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sexExpanded, onDismissRequest = { sexExpanded = false }) {
                                 sexOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sexLabel = label; sexValue = value; sexExpanded = false })
@@ -493,7 +496,7 @@ fun PetDetailContent(
                         ExposedDropdownMenuBox(expanded = sizeExpanded, onExpandedChange = { sizeExpanded = it }) {
                             OutlinedTextField(value = sizeLabel, onValueChange = {}, readOnly = true, label = { Text("Tamaño") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sizeExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sizeExpanded, onDismissRequest = { sizeExpanded = false }) {
                                 sizeOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sizeLabel = label; sizeValue = value; sizeExpanded = false })
@@ -545,7 +548,6 @@ fun PetDetailContent(
                 }
             }
 
-            // ── Medication reminders ──────────────────────────────────────────
             MedicationSection(
                 reminders = medicationReminders,
                 onRemindersChanged = { medicationReminders = it },
@@ -554,6 +556,21 @@ fun PetDetailContent(
             )
 
             Spacer(Modifier.height(8.dp))
+
+            if (isEditMode && onReportLost != null) {
+                AnimatedVisibility(visible, enter = fadeIn(tween(400, 340)) + slideInVertically(tween(400, 340)) { 60 }) {
+                    OutlinedButton(
+                        onClick = onReportLost,
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        enabled = !isLoading,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Report, null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Reportar como perdida", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
 
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 350)) + slideInVertically(tween(400, 350)) { 60 }) {
                 Button(
@@ -580,7 +597,8 @@ fun PetDetailContent(
                             petDescription.trim().ifEmpty { null }, isNeutered,
                             petAllergies.trim().ifEmpty { null },
                             medicalNotes.trim().ifEmpty { null },
-                            photoUri?.toString()
+                            photoUri?.toString(),
+                            context
                         )
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -614,7 +632,7 @@ fun PetDetailScreenCreatePreview() {
             isEditMode = false,
             currentPetId = -1L,
             onBack = {},
-            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -650,7 +668,7 @@ fun PetDetailScreenEditPreview() {
             isEditMode = true,
             currentPetId = 1L,
             onBack = {},
-            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
