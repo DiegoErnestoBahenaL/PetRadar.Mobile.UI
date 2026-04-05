@@ -66,6 +66,13 @@ class PetsActivity : ComponentActivity() {
                         }
                         startActivity(intent)
                     },
+                    onReportLost = { pet ->
+                        val intent = Intent(this, LostPetReportActivity::class.java).apply {
+                            putExtra(LostPetReportActivity.EXTRA_PET_ID, pet.id)
+                            putExtra(LostPetReportActivity.EXTRA_USER_ID, userId)
+                        }
+                        startActivity(intent)
+                    },
                     onBack = { finish() }
                 )
             }

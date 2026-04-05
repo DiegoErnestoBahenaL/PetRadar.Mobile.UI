@@ -64,6 +64,9 @@ class HomeActivity : ComponentActivity() {
                     // Navigates to the adoption animals screen.
                     onNavigateToAdoptions    = { startActivity(Intent(this, AdoptionAnimalsActivity::class.java)) },
 
+                    // Navigates to the user's reports screen.
+                    onNavigateToReports      = { startActivity(Intent(this, MyReportsActivity::class.java)) },
+
                     // Logs out the user:
                     // 1. Clears the locally saved session data.
                     // 2. Redirects to LoginActivity, clearing the navigation history,

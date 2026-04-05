@@ -13,19 +13,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Singleton that provides the configured [ApiService] instance for the entire app.
  *
- * Main responsibilities:
- *  - Build the HTTP client ([OkHttpClient]) with logging and authentication interceptors.
- *  - Configure [Retrofit] with the base URL and the JSON converter (Gson).
- *  - Expose the [ApiService] instance ready to use in repositories.
+ * Provides HTTP client with logging, auth headers, and Retrofit configuration.
  *
- * [WeakReference] usage for context:
- *  A weak reference to the [android.app.Application] context is stored to avoid memory leaks.
- *  The authentication token is resolved at request time (not at construction time),
- *  ensuring the most recent token is always used (e.g. after a refresh).
+ * WeakReference avoids memory leaks; token resolved at request time for freshness.
  *
- * Initialization:
- *  Call [init] once in [com.example.petradar.PetRadarApplication.onCreate]
- *  before making any network requests.
+ * Call [init] in Application.onCreate before making network requests.
  */
 object RetrofitClient {
 
@@ -78,7 +70,6 @@ object RetrofitClient {
             .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val requestBuilder = chain.request().newBuilder()
-                    .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json")
 
                 // Resolve the token at request time to always use the most up-to-date value.
