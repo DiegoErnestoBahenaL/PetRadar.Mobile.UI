@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -280,7 +281,7 @@ fun LostPetReportScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { requestCurrentLocation() }) {
                     Icon(Icons.Default.MyLocation, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Usar mi ubicación actual")
                 }
             }
@@ -410,7 +411,7 @@ fun LostPetReportScreen(
                     CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Default.Report, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Publicar reporte")
                 }
             }

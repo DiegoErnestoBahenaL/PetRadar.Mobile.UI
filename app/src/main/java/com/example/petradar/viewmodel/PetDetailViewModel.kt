@@ -111,8 +111,12 @@ class PetDetailViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     val createdPetId = resolveCreatedPetId(userId, name)
                     if (!photoUri.isNullOrBlank() && createdPetId != null) {
-                        PetPhotoStore.save(context, createdPetId, photoUri)
-                        uploadPetMainPicture(createdPetId, photoUri, context)
+                        try {
+                            PetPhotoStore.save(context, createdPetId, photoUri)
+                            uploadPetMainPicture(createdPetId, photoUri, context)
+                        } catch (e: Exception) {
+                            _errorMessage.value = "Pet created successfully, but photo upload failed: ${e.message}"
+                        }
                     }
                     _saveSuccess.value = true
                 } else {
@@ -162,8 +166,12 @@ class PetDetailViewModel : ViewModel() {
                 val response = repository.updatePet(petId, request)
                 if (response.isSuccessful) {
                     if (!photoUri.isNullOrBlank()) {
-                        PetPhotoStore.save(context, petId, photoUri)
-                        uploadPetMainPicture(petId, photoUri, context)
+                        try {
+                            PetPhotoStore.save(context, petId, photoUri)
+                            uploadPetMainPicture(petId, photoUri, context)
+                        } catch (e: Exception) {
+                            _errorMessage.value = "Pet updated, but photo upload failed: ${e.message}"
+                        }
                     }
                     _saveSuccess.value = true
                     loadPet(petId)

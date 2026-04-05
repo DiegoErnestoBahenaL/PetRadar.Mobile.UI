@@ -38,7 +38,7 @@ class MyReportsViewModel : ViewModel() {
                     _errorMessage.value = "No se pudieron cargar los reportes (${response.code()})"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexion: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
