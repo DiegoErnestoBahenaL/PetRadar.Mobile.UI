@@ -186,6 +186,37 @@ interface ApiService {
     @DELETE("api/UserPets/{id}")
     suspend fun deleteUserPet(@Path("id") petId: Long): Response<Unit>
 
+    /**
+     * Uploads or replaces the main picture of a pet.
+     * Endpoint: PUT /api/UserPets/{id}/mainpicture
+     *
+     * The image is sent as multipart/form-data with the field name "file".
+     */
+    @Multipart
+    @PUT("api/UserPets/{id}/mainpicture")
+    suspend fun uploadPetMainPicture(
+        @Path("id") petId: Long,
+        @Part file: MultipartBody.Part
+    ): Response<Unit>
+
+    // =========================================================================
+    // Reports  ->  /api/Reports
+    // =========================================================================
+
+    /**
+     * Creates a new report (e.g., lost pet report).
+     * Endpoint: POST /api/Reports
+     */
+    @POST("api/Reports")
+    suspend fun createReport(@Body request: ReportCreateModel): Response<Unit>
+
+    /**
+     * Retrieves all reports created by a specific user.
+     * Endpoint: GET /api/Reports/user/{userId}
+     */
+    @GET("api/Reports/user/{userId}")
+    suspend fun getReportsByUserId(@Path("userId") userId: Long): Response<List<ReportViewModel>>
+
     // =========================================================================
     // Veterinary Appointments  →  /api/VeterinaryAppointments
     // =========================================================================
@@ -482,6 +513,81 @@ data class UserPetUpdateModel(
     val isNeutered: Boolean? = null,
     val allergies: String? = null,
     val medicalNotes: String? = null
+)
+
+// =============================================================================
+// Data models for Reports
+// =============================================================================
+
+/**
+ * Payload for creating a report (ReportCreateModel in Swagger).
+ *
+ * For lost pet flow, set:
+ * - reportType = "Lost"
+ * - reportStatus = "Active"
+ */
+data class ReportCreateModel(
+    val userId: Long,
+    val userPetId: Long? = null,
+    val species: String,
+    val breed: String? = null,
+    val color: String? = null,
+    val sex: String? = null,
+    val size: String? = null,
+    val approximateAge: Double? = null,
+    val weight: Double? = null,
+    val description: String? = null,
+    val isNeutered: Boolean? = null,
+    val reportType: String,
+    val reportStatus: String? = null,
+    val hasCollar: Boolean? = null,
+    val hasTag: Boolean? = null,
+    val incidentDate: String? = null,
+    val latitude: Double,
+    val longitude: Double,
+    val addressText: String? = null,
+    val searchRadiusMeters: Int? = null,
+    val useAlternateContact: Boolean? = null,
+    val contactName: String? = null,
+    val contactPhone: String? = null,
+    val contactEmail: String? = null,
+    val offersReward: Boolean? = null,
+    val rewardAmount: Double? = null
+)
+
+/** Represents a report returned by the API (ReportViewModel in Swagger). */
+data class ReportViewModel(
+    val id: Long,
+    val userId: Long,
+    val userPetId: Long?,
+    val species: String?,
+    val breed: String?,
+    val color: String?,
+    val sex: String?,
+    val size: String?,
+    val approximateAge: Double?,
+    val weight: Double?,
+    val description: String?,
+    val photoURL: String?,
+    val additionalPhotosURL: String?,
+    val isNeutered: Boolean?,
+    val reportType: String?,
+    val reportStatus: String?,
+    val hasCollar: Boolean?,
+    val hasTag: Boolean?,
+    val reportDate: String?,
+    val incidentDate: String?,
+    val latitude: Double?,
+    val longitude: Double?,
+    val addressText: String?,
+    val searchRadiusMeters: Int?,
+    val useAlternateContact: Boolean?,
+    val contactName: String?,
+    val contactPhone: String?,
+    val contactEmail: String?,
+    val offersReward: Boolean?,
+    val rewardAmount: Double?,
+    val views: Int?
 )
 
 // =============================================================================

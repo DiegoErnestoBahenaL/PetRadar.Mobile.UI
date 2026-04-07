@@ -1,6 +1,7 @@
 package com.example.petradar
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,11 +24,9 @@ import com.example.petradar.viewmodel.PetDetailViewModel
  *               The ViewModel builds a POST /api/UserPets request.
  *
  * Note on photos:
- *  - The API (UserPetUpdateModel) does not expose a photo field.
- *  - Photos are stored locally in [com.example.petradar.utils.PetPhotoStore]
- *    using the petId as a key.
- *  - For new pets the photo is re-associated the next time the user edits
- *    the pet (when the petId returned by the API already exists).
+ *  - The selected photo is uploaded to the backend via PUT /api/UserPets/{id}/mainpicture.
+ *  - A local copy is also kept in [com.example.petradar.utils.PetPhotoStore]
+ *    so the image can still be shown immediately if the API response is delayed.
  *
  * Delegates all UI to [PetDetailScreen] (Jetpack Compose).
  */
@@ -106,6 +105,15 @@ class PetDetailActivity : ComponentActivity() {
                     isEditMode = petId > 0,
                     onBack = { finish() },
                     onDelete = { viewModel.deletePet() },
+                    onReportLost = {
+                        if (petId > 0) {
+                            val intent = Intent(this, LostPetReportActivity::class.java).apply {
+                                putExtra(LostPetReportActivity.EXTRA_PET_ID, petId)
+                                putExtra(LostPetReportActivity.EXTRA_USER_ID, userId)
+                            }
+                            startActivity(intent)
+                        }
+                    },
                     onSaveMedications = { reminders ->
                         if (petId > 0) {
                             val petName = viewModel.pet.value?.name ?: ""

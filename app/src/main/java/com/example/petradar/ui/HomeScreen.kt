@@ -63,6 +63,7 @@ fun HomeScreen(
     onNavigateToPets: () -> Unit,
     onNavigateToAppointments: () -> Unit,
     onNavigateToAdoptions: () -> Unit,
+    onNavigateToReports: () -> Unit,
     onLogout: () -> Unit
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -180,7 +181,10 @@ fun HomeScreen(
                     icon = { Icon(Icons.Default.Search, contentDescription = null) },
                     label = { Text("Reportes") },
                     selected = false,
-                    onClick = { scope.launch { drawerState.close() } },
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToReports()
+                    },
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
 
