@@ -108,7 +108,10 @@ fun AdoptionAnimalFormScreen(
     val additionalGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) pendingAdditionalPhotos = pendingAdditionalPhotos + uris
+        if (uris.isNotEmpty()) {
+            val totalAllowed = (5 - additionalPhotos.size - pendingAdditionalPhotos.size).coerceAtLeast(0)
+            pendingAdditionalPhotos = pendingAdditionalPhotos + uris.take(totalAllowed)
+        }
     }
 
     // Camera launcher
@@ -120,6 +123,18 @@ fun AdoptionAnimalFormScreen(
         }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "adoption_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            cameraLauncher.launch(uri)
+        }
+    }
+
     fun launchCamera() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
@@ -127,6 +142,8 @@ fun AdoptionAnimalFormScreen(
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
             cameraImageUri = uri
             cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 

@@ -441,11 +441,11 @@ interface ApiService {
     ): Response<Unit>
 
     /**
-     * Retrieves all additional photo URLs for an adoption animal.
+     * Retrieves additional photo filenames for an adoption animal.
      * Endpoint: GET /api/AdoptionAnimals/{id}/additionalphotos
      *
      * @param id Adoption animal ID.
-     * @return List of photo URL strings.
+     * @return List of photo filenames (pass each to [com.example.petradar.utils.PetImageUrlResolver.adoptionAdditionalPhotoUrl]).
      */
     @GET("api/AdoptionAnimals/{id}/additionalphotos")
     suspend fun getAdoptionAnimalAdditionalPhotos(@Path("id") id: Long): Response<List<String>>

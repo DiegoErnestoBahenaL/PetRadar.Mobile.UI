@@ -14,7 +14,9 @@ import com.example.petradar.utils.PetPhotoStore
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 class PetDetailViewModel : ViewModel() {
     private val repository = PetRepository()
     private val _pet = MutableLiveData<UserPetViewModel?>()
@@ -89,8 +91,8 @@ class PetDetailViewModel : ViewModel() {
         }
     }
 
-    private fun buildFilePart(uri: Uri, context: Context): MultipartBody.Part? {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    private suspend fun buildFilePart(uri: Uri, context: Context): MultipartBody.Part? = withContext(Dispatchers.IO) {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
         val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
         val extension = when {
             mimeType.contains("png", ignoreCase = true) -> "png"
@@ -98,7 +100,7 @@ class PetDetailViewModel : ViewModel() {
             else -> "jpg"
         }
         val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-        return MultipartBody.Part.createFormData(
+        MultipartBody.Part.createFormData(
             name = "files",
             filename = "pet_extra_${System.currentTimeMillis()}.$extension",
             body = requestBody
@@ -293,20 +295,21 @@ class PetDetailViewModel : ViewModel() {
     private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context) {
         val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
 
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
-        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val extension = when {
-            mimeType.contains("png", ignoreCase = true) -> "png"
-            mimeType.contains("webp", ignoreCase = true) -> "webp"
-            else -> "jpg"
-        }
-
-        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-        val filePart = MultipartBody.Part.createFormData(
-            name = "file",
-            filename = "pet_main.$extension",
-            body = requestBody
-        )
+        val filePart = withContext(Dispatchers.IO) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val extension = when {
+                mimeType.contains("png", ignoreCase = true) -> "png"
+                mimeType.contains("webp", ignoreCase = true) -> "webp"
+                else -> "jpg"
+            }
+            val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+            MultipartBody.Part.createFormData(
+                name = "file",
+                filename = "pet_main.$extension",
+                body = requestBody
+            )
+        } ?: return
 
         val response = repository.uploadPetMainPicture(petId, filePart)
         if (!response.isSuccessful) {
