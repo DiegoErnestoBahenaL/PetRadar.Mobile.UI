@@ -67,6 +67,15 @@ class HomeActivity : ComponentActivity() {
                     // Navigates to the user's reports screen.
                     onNavigateToReports      = { startActivity(Intent(this, MyReportsActivity::class.java)) },
 
+                    // Opens quick lost-report flow with camera capture from Home.
+                    onQuickReportPhotoCaptured = { photoUri ->
+                        val intent = Intent(this, LostPetReportActivity::class.java).apply {
+                            putExtra(LostPetReportActivity.EXTRA_USER_ID, AuthManager.getUserId(this@HomeActivity) ?: -1L)
+                            putExtra(LostPetReportActivity.EXTRA_PHOTO_URI, photoUri)
+                        }
+                        startActivity(intent)
+                    },
+
                     // Logs out the user:
                     // 1. Clears the locally saved session data.
                     // 2. Redirects to LoginActivity, clearing the navigation history,

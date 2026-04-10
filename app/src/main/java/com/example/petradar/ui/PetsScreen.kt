@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.petradar.api.UserPetViewModel
-import com.example.petradar.utils.PetPhotoStore
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.viewmodel.PetViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,8 +41,8 @@ import com.example.petradar.viewmodel.PetViewModel
  *  - Confirmation dialog before deleting a pet.
  *  - Snackbar for displaying network errors.
  *
- * Each pet's photo is resolved first from [PetPhotoStore] (local store)
- * and, if not found, from the API's `photoURL` field.
+ * Each pet's photo is fetched from the deterministic API endpoint
+ * GET /api/UserPets/{id}/mainpicture, mismo patrón que la imagen de perfil.
  *
  * @param viewModel  ViewModel with the pet list and deletion logic.
  * @param userId     User ID; used to reload the list on pull-to-refresh.
@@ -85,13 +85,14 @@ fun PetsScreen(
                 TextButton(
                     onClick = {
                         petToDelete?.let { p -> viewModel.deletePet(p.id, p.userId) }
+                        showDeleteDialog = false
                         petToDelete = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false; petToDelete = null }) { Text("Cancelar") }
             }
         )
     }
@@ -146,7 +147,7 @@ fun PetsScreen(
                                     pet = pet,
                                     onEdit = { onEditPet(pet) },
                                     onReportLost = { onReportLost(pet) },
-                                    onDelete = { petToDelete = pet; }
+                                    onDelete = { petToDelete = pet; showDeleteDialog = true }
                                 )
                             }
                             item { Spacer(Modifier.height(80.dp)) }
@@ -218,9 +219,8 @@ private fun PetCard(
     val speciesEmoji = if (pet.species?.lowercase() == "cat") "🐱" else "🐶"
     val petBreed = pet.breed?.takeIf { it.isNotBlank() } ?: "Raza no especificada"
 
-    // Resolve photo: local store first, then API URL.
-    // Not wrapped in remember() so it always reflects the latest stored value.
-    val photoUriStr = PetPhotoStore.get(context, pet.id) ?: pet.photoURL?.takeIf { it.isNotBlank() }
+    // URL determinística desde el servidor, igual que la imagen de perfil.
+    val photoUriStr = PetImageUrlResolver.mainPictureEndpoint(pet.id)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -236,17 +236,17 @@ private fun PetCard(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (photoUriStr != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(photoUriStr).crossfade(true).build(),
-                        contentDescription = pet.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
-                    )
-                } else {
-                    Text(text = speciesEmoji, fontSize = 28.sp)
-                }
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(photoUriStr)
+                        .crossfade(true)
+                        .memoryCacheKey(photoUriStr)
+                        .diskCacheKey(photoUriStr)
+                        .build(),
+                    contentDescription = pet.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                )
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {

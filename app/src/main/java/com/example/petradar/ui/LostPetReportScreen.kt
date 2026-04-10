@@ -2,13 +2,16 @@ package com.example.petradar.ui
 
 import android.Manifest
 import android.content.Context
+import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.view.MotionEvent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,20 +19,35 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -44,18 +62,32 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.livedata.observeAsState
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.core.net.toUri
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.petradar.api.UserPetViewModel
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.viewmodel.LostPetReportViewModel
+import java.io.File
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -87,14 +119,49 @@ data class LostReportFormData(
 @Composable
 fun LostPetReportScreen(
     viewModel: LostPetReportViewModel,
+    initialPhotoUri: String? = null,
     onBack: () -> Unit,
-    onSubmit: (LostReportFormData, UserPetViewModel?) -> Unit
+    onSubmit: (LostReportFormData, UserPetViewModel?, String?) -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val pet by viewModel.pet.observeAsState()
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val saveSuccess by viewModel.saveSuccess.observeAsState(false)
+    val petAdditionalPhotoNames by viewModel.petAdditionalPhotoNames.observeAsState(emptyList())
+
+    var mainPhotoUri by remember { mutableStateOf<Uri?>(initialPhotoUri?.toUri()) }
+
+    // When the pet loads, pre-fill the main photo from the API if no photo was passed from HomeActivity
+    LaunchedEffect(pet) {
+        val loadedPet = pet ?: return@LaunchedEffect
+        if (mainPhotoUri == null && loadedPet.id > 0) {
+            mainPhotoUri = PetImageUrlResolver.mainPictureEndpoint(loadedPet.id).toUri()
+        }
+    }
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showPhotoSourceDialog by remember { mutableStateOf(false) }
+
+    val mainGalleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? -> if (uri != null) mainPhotoUri = uri }
+
+    val mainCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean -> if (success && cameraImageUri != null) mainPhotoUri = cameraImageUri }
+
+    fun launchCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "report_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            mainCameraLauncher.launch(uri)
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -105,7 +172,6 @@ fun LostPetReportScreen(
     var detailsText by remember { mutableStateOf("") }
     var hasCollar by remember { mutableStateOf(false) }
     var hasTag by remember { mutableStateOf(false) }
-    var searchRadiusText by remember { mutableStateOf("3000") }
     var useAlternateContact by remember { mutableStateOf(false) }
     var contactName by remember { mutableStateOf("") }
     var contactPhone by remember { mutableStateOf("") }
@@ -113,6 +179,8 @@ fun LostPetReportScreen(
     var offersReward by remember { mutableStateOf(false) }
     var rewardAmountText by remember { mutableStateOf("") }
     var locationError by remember { mutableStateOf<String?>(null) }
+    var addressError by remember { mutableStateOf<String?>(null) }
+    var isGeocoding by remember { mutableStateOf(false) }
 
     fun selectPoint(point: GeoPoint) {
         selectedPoint = point
@@ -120,21 +188,25 @@ fun LostPetReportScreen(
         mapView?.controller?.setCenter(point)
         mapView?.controller?.setZoom(16.0)
         mapView?.invalidate()
+        // Auto-fill address via reverse geocoding
+        scope.launch {
+            val addr = reverseGeocode(context, point.latitude, point.longitude)
+            if (addr.isNotBlank()) addressText = addr
+        }
     }
 
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            tryUseCurrentLocation(context) { point, error ->
-                if (point != null) {
-                    selectPoint(point)
-                } else {
-                    locationError = error ?: "No se pudo obtener tu ubicación actual."
-                }
+    fun searchAddress() {
+        if (addressText.isBlank()) return
+        scope.launch {
+            isGeocoding = true
+            addressError = null
+            val point = forwardGeocode(context, addressText)
+            isGeocoding = false
+            if (point != null) {
+                selectPoint(point)
+            } else {
+                addressError = "No se encontró la dirección. Intenta ser más específico."
             }
-        } else {
-            locationError = "Se denegó el permiso de ubicación."
         }
     }
 
@@ -162,7 +234,7 @@ fun LostPetReportScreen(
                 }
             }
         } else {
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            locationError = "Se denegó el permiso de ubicación."
         }
     }
 
@@ -203,6 +275,104 @@ fun LostPetReportScreen(
                     Text("Raza: ${pet?.breed ?: "-"}")
                 }
             }
+
+            // ── Photos Section (main + additional) ────────────────────────
+            if (showPhotoSourceDialog) {
+                AlertDialog(
+                    onDismissRequest = { showPhotoSourceDialog = false },
+                    icon = { Icon(Icons.Default.AddAPhoto, null, tint = MaterialTheme.colorScheme.primary) },
+                    title = { Text("Foto principal") },
+                    text = { Text("¿Cómo deseas agregar la foto?") },
+                    confirmButton = {
+                        TextButton(onClick = { showPhotoSourceDialog = false; launchCamera() }) {
+                            Icon(Icons.Default.CameraAlt, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.height(2.dp))
+                            Text("Cámara")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showPhotoSourceDialog = false; mainGalleryLauncher.launch("image/*") }) {
+                            Icon(Icons.Default.AddPhotoAlternate, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.height(2.dp))
+                            Text("Galería")
+                        }
+                    }
+                )
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("Fotos del reporte", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    // Main photo
+                    if (mainPhotoUri != null) {
+                        Box {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(mainPhotoUri).crossfade(true).build(),
+                                contentDescription = "Foto principal",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(10.dp))
+                            )
+                            IconButton(
+                                onClick = { mainPhotoUri = null },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(Icons.Default.Cancel, null, tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { showPhotoSourceDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading
+                        ) {
+                            Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.height(4.dp))
+                            Text("Cambiar foto principal")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { showPhotoSourceDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading
+                        ) {
+                            Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.height(4.dp))
+                            Text("Agregar foto principal")
+                        }
+                    }
+
+                    // Additional photos from the pet (shown for reference; auto-copied to report on submit)
+                    val loadedPetId = pet?.id ?: 0L
+                    if (petAdditionalPhotoNames.isNotEmpty() && loadedPetId > 0) {
+                        HorizontalDivider()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Fotos adicionales (${petAdditionalPhotoNames.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                            )
+                        }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(petAdditionalPhotoNames) { photoName ->
+                                val url = PetImageUrlResolver.petAdditionalPhotoUrl(loadedPetId, photoName)
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(url).crossfade(true)
+                                        .memoryCacheKey(url).diskCacheKey(url).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(88.dp).clip(RoundedCornerShape(10.dp))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            // ── End Photos ────────────────────────────────────────────────
 
             Text("Ubicación donde se perdió", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
@@ -291,10 +461,23 @@ fun LostPetReportScreen(
 
             OutlinedTextField(
                 value = addressText,
-                onValueChange = { addressText = it },
+                onValueChange = { addressText = it; addressError = null },
                 label = { Text("Dirección de referencia") },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                enabled = !isLoading && !isGeocoding,
+                isError = addressError != null,
+                supportingText = addressError?.let { err -> { Text(err) } },
+                trailingIcon = {
+                    if (isGeocoding) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    } else {
+                        IconButton(onClick = { searchAddress() }, enabled = addressText.isNotBlank()) {
+                            Icon(Icons.Default.Search, contentDescription = "Buscar dirección")
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { searchAddress() })
             )
 
             OutlinedTextField(
@@ -303,15 +486,6 @@ fun LostPetReportScreen(
                 label = { Text("Detalles del incidente") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
-                enabled = !isLoading
-            )
-
-            OutlinedTextField(
-                value = searchRadiusText,
-                onValueChange = { searchRadiusText = it },
-                label = { Text("Radio de búsqueda (metros)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
                 enabled = !isLoading
             )
 
@@ -391,7 +565,7 @@ fun LostPetReportScreen(
                         incidentDateIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                         hasCollar = hasCollar,
                         hasTag = hasTag,
-                        searchRadiusMeters = searchRadiusText.toIntOrNull() ?: 3000,
+                        searchRadiusMeters = 3000,
                         useAlternateContact = useAlternateContact,
                         contactName = contactName.trim().ifEmpty { null },
                         contactPhone = contactPhone.trim().ifEmpty { null },
@@ -399,7 +573,13 @@ fun LostPetReportScreen(
                         offersReward = offersReward,
                         rewardAmount = rewardAmountText.toDoubleOrNull()
                     )
-                    onSubmit(form, pet)
+                    // Only pass the main photo if it's a local URI (content:// or file://).
+                    // HTTP URLs pre-filled from the pet's API are not re-uploaded.
+                    val localMainPhotoUri = mainPhotoUri?.let { uri ->
+                        val scheme = uri.scheme?.lowercase() ?: ""
+                        if (scheme == "content" || scheme == "file") uri.toString() else null
+                    }
+                    onSubmit(form, pet, localMainPhotoUri)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -429,6 +609,45 @@ fun LostPetReportScreen(
         }
     }
 }
+
+/** Returns a [GeoPoint] for the given address string, or null if not found. */
+private suspend fun forwardGeocode(context: Context, address: String): GeoPoint? =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val geocoder = Geocoder(context, java.util.Locale.getDefault())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val deferred = CompletableDeferred<GeoPoint?>()
+                geocoder.getFromLocationName(address, 1) { addresses ->
+                    val a = addresses.firstOrNull()
+                    deferred.complete(if (a != null) GeoPoint(a.latitude, a.longitude) else null)
+                }
+                deferred.await()
+            } else {
+                @Suppress("DEPRECATION")
+                val results = geocoder.getFromLocationName(address, 1)
+                val a = results?.firstOrNull()
+                if (a != null) GeoPoint(a.latitude, a.longitude) else null
+            }
+        }.getOrNull()
+    }
+
+/** Returns a human-readable address for the given coordinates, or empty string if unavailable. */
+private suspend fun reverseGeocode(context: Context, lat: Double, lon: Double): String =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val geocoder = Geocoder(context, java.util.Locale.getDefault())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val deferred = CompletableDeferred<String>()
+                geocoder.getFromLocation(lat, lon, 1) { addresses ->
+                    deferred.complete(addresses.firstOrNull()?.getAddressLine(0) ?: "")
+                }
+                deferred.await()
+            } else {
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocation(lat, lon, 1)?.firstOrNull()?.getAddressLine(0) ?: ""
+            }
+        }.getOrDefault("")
+    }
 
 private fun tryUseCurrentLocation(context: Context, callback: (point: GeoPoint?, errorMessage: String?) -> Unit) {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) !=

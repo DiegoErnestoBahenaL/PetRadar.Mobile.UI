@@ -116,14 +116,6 @@ fun RegisterScreen(
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         if (success) { cameraImageUri?.let { selectedPhotoUri = it; onPhotoSelected(it) } }
     }
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            val uri = createCameraUri()
-            cameraImageUri = uri
-            cameraLauncher.launch(uri)
-        }
-    }
-
     var visible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -151,8 +143,6 @@ fun RegisterScreen(
                             val uri = createCameraUri()
                             cameraImageUri = uri
                             cameraLauncher.launch(uri)
-                        } else {
-                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     }
                 )

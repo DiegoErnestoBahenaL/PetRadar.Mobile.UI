@@ -116,16 +116,6 @@ fun ProfileScreen(
         }
     }
 
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            val uri = createCameraUri()
-            pendingPhotoUri = uri
-            cameraLauncher.launch(uri)
-        }
-    }
-
     var visible by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -189,8 +179,6 @@ fun ProfileScreen(
                             val uri = createCameraUri()
                             pendingPhotoUri = uri
                             cameraLauncher.launch(uri)
-                        } else {
-                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                         }
                     }
                 )

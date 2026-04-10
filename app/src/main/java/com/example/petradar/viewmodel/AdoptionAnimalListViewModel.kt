@@ -4,9 +4,13 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.petradar.api.AdoptionAnimalUpdateModel
 import com.example.petradar.api.AdoptionAnimalViewModel
 import com.example.petradar.repository.AdoptionAnimalRepository
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * ViewModel that manages the business logic for the adoption animals list.
@@ -41,6 +45,10 @@ class AdoptionAnimalListViewModel : ViewModel() {
     private val _deleteSuccess = MutableLiveData<Boolean>()
     /** Emits true immediately after an adoption animal is successfully deleted. */
     val deleteSuccess: LiveData<Boolean> = _deleteSuccess
+
+    private val _adoptSuccess = MutableLiveData<Boolean?>(null)
+    /** Emits true after a successful adoption request; null when no action has been taken yet. */
+    val adoptSuccess: LiveData<Boolean?> = _adoptSuccess
 
     /**
      * Loads all adoption animals from the API.
@@ -87,6 +95,42 @@ class AdoptionAnimalListViewModel : ViewModel() {
             } catch (e: Exception) {
                 _errorMessage.value = "Connection error: ${e.message}"
                 _deleteSuccess.value = false
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Marks an animal as adopted by the current user and reloads the adoption animals list.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}
+     *
+     * @param animalId ID of the animal to mark as adopted.
+     * @param adopterId ID of the adopter (current user).
+     */
+    fun adoptAnimal(animalId: Long, adopterId: Long) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val response = repository.update(
+                    animalId,
+                    AdoptionAnimalUpdateModel(
+                        status = "Adopted",
+                        adoptionDate = today,
+                        adopterId = adopterId
+                    )
+                )
+                if (response.isSuccessful) {
+                    _adoptSuccess.value = true
+                    loadAnimals()
+                } else {
+                    _adoptSuccess.value = false
+                    _errorMessage.value = "Error al solicitar la adopción: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Connection error: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

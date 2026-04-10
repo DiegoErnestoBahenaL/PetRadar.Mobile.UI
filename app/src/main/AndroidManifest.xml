@@ -102,6 +102,11 @@
             android:exported="false"
             android:label="Animal en Adopción"
             android:parentActivityName=".AdoptionAnimalsActivity" />
+        <activity
+            android:name=".AdoptionAnimalDetailActivity"
+            android:exported="false"
+            android:label="Detalle de Adopción"
+            android:parentActivityName=".AdoptionAnimalsActivity" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
