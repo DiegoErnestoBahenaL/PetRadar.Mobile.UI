@@ -242,8 +242,12 @@ class PetDetailViewModel : ViewModel() {
                 val response = repository.updatePet(petId, request)
                 if (response.isSuccessful) {
                     if (!photoUri.isNullOrBlank()) {
-                        PetPhotoStore.save(context, petId, photoUri)
-                        uploadPetMainPicture(petId, photoUri, context)
+                        try {
+                            PetPhotoStore.save(context, petId, photoUri)
+                            uploadPetMainPicture(petId, photoUri, context)
+                        } catch (e: Exception) {
+                            _errorMessage.value = "Pet updated, but photo upload failed: ${e.message}"
+                        }
                     }
                     if (additionalPhotoUris.isNotEmpty()) {
                         uploadAdditionalPhotosInternal(petId, additionalPhotoUris, context)

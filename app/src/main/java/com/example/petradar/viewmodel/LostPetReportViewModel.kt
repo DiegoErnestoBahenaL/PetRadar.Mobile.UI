@@ -57,7 +57,7 @@ class LostPetReportViewModel : ViewModel() {
                     _errorMessage.value = "No se pudo cargar la mascota (${response.code()})"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexion: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -95,7 +95,7 @@ class LostPetReportViewModel : ViewModel() {
                     _errorMessage.value = "No se pudo crear el reporte (${response.code()})"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexion: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }

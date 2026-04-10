@@ -450,7 +450,7 @@ fun LostPetReportScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { requestCurrentLocation() }) {
                     Icon(Icons.Default.MyLocation, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Usar mi ubicación actual")
                 }
             }
@@ -590,7 +590,7 @@ fun LostPetReportScreen(
                     CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Default.Report, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Publicar reporte")
                 }
             }
