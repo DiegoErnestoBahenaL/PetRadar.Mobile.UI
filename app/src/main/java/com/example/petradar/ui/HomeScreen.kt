@@ -1,5 +1,10 @@
 package com.example.petradar.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -7,6 +12,9 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,11 +33,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.petradar.ui.theme.PetAccent
 import com.example.petradar.ui.theme.PetTeal40
 import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,6 +64,7 @@ import kotlinx.coroutines.launch
  * @param onNavigateToPets      Navigates to [com.example.petradar.PetsActivity].
  * @param onNavigateToAppointments Navigates to [com.example.petradar.AppointmentsActivity].
  * @param onNavigateToAdoptions Navigates to [com.example.petradar.AdoptionAnimalsActivity].
+ * @param onQuickReportPhotoCaptured Opens quick report flow after camera capture.
  * @param onLogout              Signs out and navigates to LoginActivity.
  */
 fun HomeScreen(
@@ -64,11 +76,46 @@ fun HomeScreen(
     onNavigateToAppointments: () -> Unit,
     onNavigateToAdoptions: () -> Unit,
     onNavigateToReports: () -> Unit,
+    onQuickReportPhotoCaptured: (String) -> Unit,
     onLogout: () -> Unit
 ) {
+    val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var visible by remember { mutableStateOf(false) }
+    var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            cameraImageUri?.toString()?.let(onQuickReportPhotoCaptured)
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val photoFile = File(context.cacheDir, "quick_reports").apply { mkdirs() }
+                .let { File(it, "report_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            takePictureLauncher.launch(uri)
+        }
+    }
+
+    fun launchQuickCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val photoFile = File(context.cacheDir, "quick_reports").apply { mkdirs() }
+                .let { File(it, "report_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            takePictureLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     LaunchedEffect(Unit) { visible = true }
 
@@ -231,6 +278,15 @@ fun HomeScreen(
                     windowInsets = WindowInsets.statusBars
                 )
             },
+            bottomBar = {
+                HomeBottomBar(
+                    onAppointments = onNavigateToAppointments,
+                    onAdoptions = onNavigateToAdoptions,
+                    onCamera = ::launchQuickCamera,
+                    onReports = onNavigateToReports,
+                    onProfile = onNavigateToProfile
+                )
+            },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
@@ -314,36 +370,28 @@ fun HomeScreen(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                // Quick access grid
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(500, 100)) + slideInVertically(tween(500, 100)) { 60 }
                 ) {
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(tween(500, 100)) + slideInVertically(tween(500, 100)) { 60 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        QuickAccessCard(
-                            icon = Icons.Default.Face,
-                            title = "Mis Mascotas",
-                            color = PetTeal40,
-                            onClick = onNavigateToPets
-                        )
-                    }
+                    QuickAccessCard(
+                        icon = Icons.Default.Pets,
+                        title = "Mis Mascotas",
+                        color = PetTeal40,
+                        onClick = onNavigateToPets
+                    )
+                }
 
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(tween(500, 200)) + slideInVertically(tween(500, 200)) { 60 },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        QuickAccessCard(
-                            icon = Icons.Default.AccountCircle,
-                            title = "Mi Perfil",
-                            color = PetAccent,
-                            onClick = onNavigateToProfile
-                        )
-                    }
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(tween(500, 200)) + slideInVertically(tween(500, 200)) { 60 }
+                ) {
+                    QuickAccessCard(
+                        icon = Icons.Default.Settings,
+                        title = "Menú y Configuración",
+                        color = PetAccent,
+                        onClick = { scope.launch { drawerState.open() } }
+                    )
                 }
 
                 AnimatedVisibility(
@@ -351,26 +399,109 @@ fun HomeScreen(
                     enter = fadeIn(tween(500, 300)) + slideInVertically(tween(500, 300)) { 60 }
                 ) {
                     QuickAccessCard(
-                        icon = Icons.Default.CalendarMonth,
-                        title = "Citas Veterinarias",
-                        color = com.example.petradar.ui.theme.PetTealGrey40,
-                        onClick = onNavigateToAppointments
-                    )
-                }
-
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(tween(500, 400)) + slideInVertically(tween(500, 400)) { 60 }
-                ) {
-                    QuickAccessCard(
-                        icon = Icons.Default.Pets,
-                        title = "Adopciones",
+                        icon = Icons.AutoMirrored.Filled.ExitToApp,
+                        title = "Cerrar Sesión",
                         color = PetAccent,
-                        onClick = onNavigateToAdoptions
+                        onClick = onLogout
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HomeBottomBar(
+    onAppointments: () -> Unit,
+    onAdoptions: () -> Unit,
+    onCamera: () -> Unit,
+    onReports: () -> Unit,
+    onProfile: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Surface(shadowElevation = 8.dp) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    BottomNavAction(
+                        icon = Icons.Default.CalendarMonth,
+                        label = "Citas",
+                        onClick = onAppointments,
+                        modifier = Modifier.weight(1f)
+                    )
+                    BottomNavAction(
+                        icon = Icons.Default.Pets,
+                        label = "Adopciones",
+                        onClick = onAdoptions,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Espacio central para el botón de cámara flotante
+                    Spacer(modifier = Modifier.weight(1f))
+                    BottomNavAction(
+                        icon = Icons.Default.Search,
+                        label = "Reportes",
+                        onClick = onReports,
+                        modifier = Modifier.weight(1f)
+                    )
+                    BottomNavAction(
+                        icon = Icons.Default.AccountCircle,
+                        label = "Perfil",
+                        onClick = onProfile,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+            }
+        }
+        // Botón de cámara fuera del Surface para que no sea recortado
+        FilledIconButton(
+            onClick = onCamera,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = (-28).dp)
+                .size(62.dp),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.CameraAlt,
+                contentDescription = "Cámara",
+                modifier = Modifier.size(30.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomNavAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

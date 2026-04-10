@@ -4,6 +4,7 @@ import com.example.petradar.api.AdoptionAnimalCreateModel
 import com.example.petradar.api.AdoptionAnimalUpdateModel
 import com.example.petradar.api.AdoptionAnimalViewModel
 import com.example.petradar.api.RetrofitClient
+import okhttp3.MultipartBody
 import retrofit2.Response
 
 /**
@@ -75,5 +76,33 @@ class AdoptionAnimalRepository {
      */
     suspend fun delete(id: Long): Response<Unit> =
         api.deleteAdoptionAnimal(id)
+
+    /**
+     * Uploads or replaces the main picture of an adoption animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/mainpicture
+     */
+    suspend fun uploadMainPicture(id: Long, file: MultipartBody.Part): Response<Unit> =
+        api.uploadAdoptionAnimalMainPicture(id, file)
+
+    /**
+     * Retrieves all additional photo URLs for an adoption animal.
+     * Endpoint: GET /api/AdoptionAnimals/{id}/additionalphotos
+     */
+    suspend fun getAdditionalPhotos(id: Long): Response<List<String>> =
+        api.getAdoptionAnimalAdditionalPhotos(id)
+
+    /**
+     * Uploads one or more additional photos for an adoption animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/additionalphotos
+     */
+    suspend fun uploadAdditionalPhotos(id: Long, files: List<MultipartBody.Part>): Response<Unit> =
+        api.uploadAdoptionAnimalAdditionalPhotos(id, files)
+
+    /**
+     * Deletes a specific additional photo of an adoption animal.
+     * Endpoint: DELETE /api/AdoptionAnimals/{id}/additionalphotos/{photoName}
+     */
+    suspend fun deleteAdditionalPhoto(id: Long, photoName: String): Response<Unit> =
+        api.deleteAdoptionAnimalAdditionalPhoto(id, photoName)
 }
 

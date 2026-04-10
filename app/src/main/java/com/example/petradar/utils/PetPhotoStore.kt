@@ -8,9 +8,9 @@ import java.io.File
 /**
  * Local store for pet photo URIs.
  *
- * The PetRadar API does not expose an endpoint for uploading pet photos,
- * so photos chosen by the user are copied into the app's internal storage
- * and the resulting file URI is saved in [android.content.SharedPreferences].
+ * Pet photos are uploaded to the API via PUT /api/UserPets/{id}/mainpicture.
+ * While the API serves the images via GET /api/UserPets/{id}/mainpicture,
+ * this store keeps a local copy for immediate offline access and cache busting.
  *
  * It is an `object` (singleton) to ensure centralised access from anywhere in the app.
  *

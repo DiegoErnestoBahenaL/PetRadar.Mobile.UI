@@ -1,14 +1,9 @@
 package com.example.petradar
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import com.example.petradar.ui.AppointmentFormScreen
 import com.example.petradar.ui.theme.PetRadarTheme
@@ -46,23 +41,9 @@ class AppointmentFormActivity : ComponentActivity() {
         const val EXTRA_INITIAL_DATE = "extra_initial_date"
     }
 
-    // Permission launcher for POST_NOTIFICATIONS (Android 13+)
-    private val notifPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* permission result handled silently; alarms are scheduled regardless */ }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        // Request notification permission on Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
 
         // Read parameters from the Intent.
         val appointmentId = intent.getLongExtra(EXTRA_APPOINTMENT_ID, -1L)

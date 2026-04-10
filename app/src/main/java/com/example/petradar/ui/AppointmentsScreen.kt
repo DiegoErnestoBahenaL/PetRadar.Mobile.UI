@@ -35,7 +35,7 @@ import coil.request.ImageRequest
 import com.example.petradar.api.UserPetViewModel
 import com.example.petradar.api.VeterinaryAppointmentViewModel
 import com.example.petradar.ui.theme.*
-import com.example.petradar.utils.PetPhotoStore
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.viewmodel.AppointmentViewModel
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -58,8 +58,8 @@ import java.util.Locale
  *  - **Pull-to-refresh** to reload appointments and pets.
  *  - **Confirmation dialog** before deleting an appointment.
  *
- * Pet photos in appointment cards are resolved from
- * [PetPhotoStore] (local store) or from the API URL.
+ * Pet photos in appointment cards are fetched from the deterministic API endpoint
+ * GET /api/UserPets/{id}/mainpicture, mismo patrón que la imagen de perfil.
  *
  * @param viewModel          ViewModel with appointments, pets and CRUD operations.
  * @param userId             ID of the authenticated user.
@@ -397,11 +397,9 @@ fun AppointmentCard(
         else           -> appointment.appointmentType ?: "Otra"
     }
 
-    // Resolve pet photo: local store first, then API URL, then emoji fallback
+    // URL determinística desde el servidor, igual que la imagen de perfil.
     val petPhotoUri = remember(pet?.id) {
-        pet?.let { p ->
-            PetPhotoStore.get(context, p.id) ?: p.photoURL?.takeIf { it.isNotBlank() }
-        }
+        pet?.let { p -> PetImageUrlResolver.mainPictureEndpoint(p.id) }
     }
     val petEmoji = if (pet?.species?.lowercase() == "cat") "🐱" else "🐶"
 
@@ -430,7 +428,12 @@ fun AppointmentCard(
             ) {
                 if (petPhotoUri != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(petPhotoUri).crossfade(true).build(),
+                        model = ImageRequest.Builder(context)
+                            .data(petPhotoUri)
+                            .crossfade(true)
+                            .memoryCacheKey(petPhotoUri)
+                            .diskCacheKey(petPhotoUri)
+                            .build(),
                         contentDescription = pet?.name,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().clip(CircleShape)

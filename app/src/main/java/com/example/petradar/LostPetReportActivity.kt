@@ -16,6 +16,7 @@ class LostPetReportActivity : ComponentActivity() {
     companion object {
         const val EXTRA_PET_ID = "extra_pet_id"
         const val EXTRA_USER_ID = "extra_user_id"
+        const val EXTRA_PHOTO_URI = "extra_photo_uri"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,6 +26,7 @@ class LostPetReportActivity : ComponentActivity() {
         val petId = intent.getLongExtra(EXTRA_PET_ID, -1L)
         val userId = intent.getLongExtra(EXTRA_USER_ID, -1L)
             .let { if (it <= 0) AuthManager.getUserId(this) ?: -1L else it }
+        val initialPhotoUri = intent.getStringExtra(EXTRA_PHOTO_URI)
 
         val viewModel = ViewModelProvider(this)[LostPetReportViewModel::class.java]
         if (petId > 0) viewModel.loadPet(petId)
@@ -33,8 +35,9 @@ class LostPetReportActivity : ComponentActivity() {
             PetRadarTheme {
                 LostPetReportScreen(
                     viewModel = viewModel,
+                    initialPhotoUri = initialPhotoUri,
                     onBack = { finish() },
-                    onSubmit = { form, pet ->
+                    onSubmit = { form, pet, photoUri ->
                         if (userId <= 0) return@LostPetReportScreen
 
                         viewModel.createLostReport(
@@ -65,7 +68,9 @@ class LostPetReportActivity : ComponentActivity() {
                                 contactEmail = form.contactEmail,
                                 offersReward = form.offersReward,
                                 rewardAmount = form.rewardAmount
-                            )
+                            ),
+                            photoUri = photoUri,
+                            context = this
                         )
                     }
                 )

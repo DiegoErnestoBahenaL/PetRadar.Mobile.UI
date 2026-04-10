@@ -8,19 +8,18 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
 import com.example.petradar.ui.AdoptionAnimalsScreen
 import com.example.petradar.ui.theme.PetRadarTheme
+import com.example.petradar.utils.AuthManager
 import com.example.petradar.viewmodel.AdoptionAnimalListViewModel
+import com.example.petradar.viewmodel.AdoptionAnimalDetailViewModel
 
 /**
  * AdoptionAnimalsActivity displays the list of animals available for adoption
- * and allows navigation to create or edit each one.
+ * and lets the user choose which one to adopt.
  *
  * Flow:
  *  - On launch, loads all adoption animals via GET /api/AdoptionAnimals.
- *  - Pressing "+" navigates to [AdoptionAnimalFormActivity] in creation mode.
- *  - Tapping an animal navigates to [AdoptionAnimalFormActivity] in edit mode,
- *    passing the animalId.
- *  - On returning from [AdoptionAnimalFormActivity] (onResume), reloads the list
- *    automatically to reflect any changes (creation, edit or deletion).
+ *  - The user confirms adoption for an available animal.
+ *  - The list reloads on resume to reflect status changes.
  *
  * Delegates all UI to [AdoptionAnimalsScreen] (Jetpack Compose).
  */
@@ -32,6 +31,8 @@ class AdoptionAnimalsActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val currentUserId = AuthManager.getUserId(this) ?: -1L
+
         viewModel = ViewModelProvider(this)[AdoptionAnimalListViewModel::class.java]
         // Initial load of adoption animals on screen open.
         viewModel.loadAnimals()
@@ -40,17 +41,28 @@ class AdoptionAnimalsActivity : ComponentActivity() {
             PetRadarTheme {
                 AdoptionAnimalsScreen(
                     viewModel = viewModel,
-                    // Creation mode: navigate to form with no animal ID.
+                    currentUserId = currentUserId,
                     onAddAnimal = {
                         val intent = Intent(this, AdoptionAnimalFormActivity::class.java)
                         startActivity(intent)
                     },
-                    // Edit mode: pass the animal ID to the form.
-                    onEditAnimal = { animal ->
-                        val intent = Intent(this, AdoptionAnimalFormActivity::class.java).apply {
-                            putExtra(AdoptionAnimalFormActivity.EXTRA_ANIMAL_ID, animal.id)
-                        }
+                    onAnimalClick = { animal ->
+                        val intent = Intent(this, AdoptionAnimalDetailActivity::class.java)
+                        intent.putExtra(AdoptionAnimalDetailActivity.EXTRA_ANIMAL_ID, animal.id)
                         startActivity(intent)
+                    },
+                    onAdoptAnimal = { animal ->
+                        if (currentUserId > 0) {
+                            viewModel.adoptAnimal(animal.id, currentUserId)
+                        }
+                    },
+                    onEditAnimal = { animal ->
+                        val intent = Intent(this, AdoptionAnimalFormActivity::class.java)
+                        intent.putExtra(AdoptionAnimalFormActivity.EXTRA_ANIMAL_ID, animal.id)
+                        startActivity(intent)
+                    },
+                    onDeleteAnimal = { animal ->
+                        viewModel.deleteAnimal(animal.id)
                     },
                     onBack = { finish() }
                 )

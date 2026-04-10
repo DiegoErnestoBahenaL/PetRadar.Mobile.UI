@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +42,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.petradar.utils.MedicationReminder
 import com.example.petradar.utils.MedicationStore
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.utils.PetPhotoStore
 import com.example.petradar.viewmodel.PetDetailViewModel
 import androidx.core.net.toUri
@@ -54,7 +57,7 @@ import com.example.petradar.api.UserPetViewModel
  *
  * In **edit mode** ([isEditMode] = true):
  *  - Pre-fills fields with data loaded in [PetDetailViewModel.pet].
- *  - Shows the locally saved photo from [PetPhotoStore] if available.
+ *  - Shows the photo from the API endpoint GET /api/UserPets/{id}/mainpicture if available.
  *  - On save calls PUT /api/UserPets/{id}.
  *
  * In **create mode** ([isEditMode] = false):
@@ -66,9 +69,9 @@ import com.example.petradar.api.UserPetViewModel
  *    Date of birth, Weight, Description, Allergies, Medical notes, Neutered.
  *
  * Pet photo:
- *  - The user can pick an image from the gallery.
- *  - The photo is saved locally in [PetPhotoStore] after a successful save
- *    (the API does not support image uploads via this endpoint).
+ *  - The user can pick an image from the gallery or camera.
+ *  - The photo is uploaded to the API via PUT /api/UserPets/{id}/mainpicture
+ *    and is fetched from GET /api/UserPets/{id}/mainpicture with cache busting.
  *
  * When [PetDetailViewModel.saveSuccess] is true, closes the screen.
  *
@@ -88,6 +91,7 @@ fun PetDetailScreen(
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val saveSuccess by viewModel.saveSuccess.observeAsState(false)
+    val existingAdditionalPhotos by viewModel.additionalPhotos.observeAsState(emptyList())
 
     PetDetailContent(
         petData = petData,
@@ -96,11 +100,13 @@ fun PetDetailScreen(
         saveSuccess = saveSuccess,
         isEditMode = isEditMode,
         currentPetId = viewModel.currentPetId,
+        existingAdditionalPhotos = existingAdditionalPhotos,
+        onDeleteAdditionalPhoto = { photoName -> viewModel.deleteAdditionalPhoto(viewModel.currentPetId, photoName) },
         onBack = onBack,
         onDelete = if (isEditMode && onDelete != null) onDelete else null,
         onReportLost = if (isEditMode && onReportLost != null) onReportLost else null,
         onSaveMedications = onSaveMedications,
-        onSave = { name, speciesValue, breed, color, sexValue, sizeValue, birthDate, weight, description, isNeutered, allergies, medicalNotes, photoUri, context ->
+        onSave = { name, speciesValue, breed, color, sexValue, sizeValue, birthDate, weight, description, isNeutered, allergies, medicalNotes, photoUri, additionalPhotoUris, context ->
             viewModel.savePet(
                 name = name,
                 speciesValue = speciesValue,
@@ -115,6 +121,7 @@ fun PetDetailScreen(
                 allergies = allergies,
                 medicalNotes = medicalNotes,
                 photoUri = photoUri,
+                additionalPhotoUris = additionalPhotoUris,
                 context = context
             )
         }
@@ -130,6 +137,8 @@ fun PetDetailContent(
     saveSuccess: Boolean,
     isEditMode: Boolean,
     currentPetId: Long,
+    existingAdditionalPhotos: List<String> = emptyList(),
+    onDeleteAdditionalPhoto: ((String) -> Unit)? = null,
     onBack: () -> Unit,
     onDelete: (() -> Unit)? = null,
     onReportLost: (() -> Unit)? = null,
@@ -140,6 +149,7 @@ fun PetDetailContent(
         weight: Double?, description: String?, isNeutered: Boolean,
         allergies: String?, medicalNotes: String?,
         photoUri: String?,
+        additionalPhotoUris: List<Uri>,
         context: android.content.Context
     ) -> Unit
 ) {
@@ -149,17 +159,18 @@ fun PetDetailContent(
     var visible by remember { mutableStateOf(isInPreview) }
 
     var photoUri by remember {
-        mutableStateOf<Uri?>(
-            if (!isInPreview && isEditMode && currentPetId > 0)
-                PetPhotoStore.get(context, currentPetId)?.toUri()
-            else null
-        )
+        mutableStateOf<Uri?>(null)
     }
+    // Version counter for cache busting when the pet's main picture is uploaded
+    var photoVersion by remember { mutableStateOf(0) }
+
 
     // Temporary file URI for camera captures
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    var pendingAdditionalPhotos by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     // Activity result launchers are not available in preview mode.
     // Guard them with isInPreview to prevent render crashes.
@@ -167,6 +178,17 @@ fun PetDetailContent(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.GetContent()
         ) { uri: Uri? -> if (uri != null) photoUri = uri }
+    } else null
+
+    val additionalGalleryLauncher = if (!isInPreview) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetMultipleContents()
+        ) { uris: List<Uri> ->
+            if (uris.isNotEmpty()) {
+                val totalAllowed = (5 - existingAdditionalPhotos.size - pendingAdditionalPhotos.size).coerceAtLeast(0)
+                pendingAdditionalPhotos = pendingAdditionalPhotos + uris.take(totalAllowed)
+            }
+        }
     } else null
 
     val cameraLauncher = if (!isInPreview) {
@@ -182,7 +204,7 @@ fun PetDetailContent(
     val cameraPermissionLauncher = if (!isInPreview) {
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
-        ) { granted: Boolean ->
+        ) { granted ->
             if (granted) {
                 val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
                     .let { File(it, "pet_${System.currentTimeMillis()}.jpg") }
@@ -193,7 +215,6 @@ fun PetDetailContent(
         }
     } else null
 
-    /** Launches the camera, requesting permission first if needed. */
     fun launchCamera() {
         if (isInPreview) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -224,6 +245,8 @@ fun PetDetailContent(
     var medicalNotes by remember { mutableStateOf("") }
     var nameError by remember { mutableStateOf<String?>(null) }
     var speciesError by remember { mutableStateOf<String?>(null) }
+    var showPhotoRequiredDialog by remember { mutableStateOf(false) }
+    var photoPromptDismissed by remember { mutableStateOf(false) }
 
     var speciesExpanded by remember { mutableStateOf(false) }
     var sexExpanded by remember { mutableStateOf(false) }
@@ -241,6 +264,10 @@ fun PetDetailContent(
     val speciesOptions = listOf("Perro" to "Dog", "Gato" to "Cat")
     val sexOptions = listOf("Macho" to "Male", "Hembra" to "Female", "Desconocido" to "Unknown")
     val sizeOptions = listOf("Pequeño" to "Small", "Mediano" to "Medium", "Grande" to "Large")
+
+    val pictureUrl = if (currentPetId > 0) {
+        PetImageUrlResolver.mainPictureEndpoint(currentPetId, photoVersion)
+    } else null
 
     LaunchedEffect(Unit) { visible = true }
 
@@ -268,14 +295,8 @@ fun PetDetailContent(
         sizeLabel = foundSize?.first ?: p.size ?: ""
         sizeValue = foundSize?.second ?: p.size ?: ""
 
-        if (photoUri == null) {
-            val stored = PetPhotoStore.get(context, p.id)
-            photoUri = when {
-                stored != null -> stored.toUri()
-                !p.photoURL.isNullOrBlank() -> p.photoURL.toUri()
-                else -> null
-            }
-        }
+        // Note: photoUri is now managed as a selection UI state, not for display
+        // The photo URL for display is built from the API endpoint with cache busting
     }
 
     LaunchedEffect(errorMessage) {
@@ -284,6 +305,12 @@ fun PetDetailContent(
     }
 
     LaunchedEffect(saveSuccess) {
+        if (saveSuccess && photoUri != null && currentPetId > 0) {
+            // Photo was uploaded; increment version to bust the cache
+            photoVersion++
+            // Clear the selection state since the photo is now on the server
+            photoUri = null
+        }
         if (saveSuccess) onBack()
     }
 
@@ -311,6 +338,25 @@ fun PetDetailContent(
                     Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Galería")
+                }
+            }
+        )
+    }
+
+    if (showPhotoRequiredDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhotoRequiredDialog = false },
+            icon = { Icon(Icons.Default.AddAPhoto, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Agregar foto principal") },
+            text = { Text("Tu mascota no tiene foto principal. Agregar una ayuda a identificarla más fácilmente.") },
+            confirmButton = {
+                TextButton(onClick = { showPhotoRequiredDialog = false; showPhotoSourceDialog = true }) {
+                    Text("Agregar foto")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPhotoRequiredDialog = false; photoPromptDismissed = true }) {
+                    Text("Continuar sin foto")
                 }
             }
         )
@@ -407,11 +453,24 @@ fun PetDetailContent(
                             .clickable { showPhotoSourceDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (photoUri != null) {
+                        // Determine which image to display:
+                        // 1. If photoUri is set (locally selected but not yet uploaded), show that
+                        // 2. Otherwise, use the deterministic /mainpicture endpoint (auth-aware)
+                        // 3. Fall back to local store
+                        val displayImageUrl = when {
+                            photoUri != null -> photoUri.toString()
+                            !pictureUrl.isNullOrBlank() -> pictureUrl
+                            currentPetId > 0 -> PetPhotoStore.get(context, currentPetId)
+                            else -> null
+                        }
+
+                        if (!displayImageUrl.isNullOrBlank()) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
-                                    .data(photoUri)
+                                    .data(displayImageUrl)
                                     .crossfade(true)
+                                    .memoryCacheKey(displayImageUrl)
+                                    .diskCacheKey(displayImageUrl)
                                     .build(),
                                 contentDescription = "Foto de mascota",
                                 contentScale = ContentScale.Crop,
@@ -445,6 +504,68 @@ fun PetDetailContent(
                     }
                 }
             }
+
+            // ── Additional Photos (right below main photo) ─────────────────
+            AnimatedVisibility(visible, enter = fadeIn(tween(400, 50)) + slideInVertically(tween(400, 50)) { 30 }) {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val totalPhotos = existingAdditionalPhotos.size + pendingAdditionalPhotos.size
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Fotos adicionales ($totalPhotos/5)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        if (existingAdditionalPhotos.isNotEmpty()) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(existingAdditionalPhotos) { photoName ->
+                                    val url = com.example.petradar.utils.PetImageUrlResolver.petAdditionalPhotoUrl(currentPetId, photoName)
+                                    Box(modifier = Modifier.size(80.dp)) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context).data(url).crossfade(true).memoryCacheKey(url).diskCacheKey(url).build(),
+                                            contentDescription = null, contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                                        )
+                                        IconButton(onClick = { onDeleteAdditionalPhoto?.invoke(photoName) }, modifier = Modifier.align(Alignment.TopEnd).size(26.dp)) {
+                                            Icon(Icons.Default.Cancel, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (pendingAdditionalPhotos.isNotEmpty()) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(pendingAdditionalPhotos) { uri ->
+                                    Box(modifier = Modifier.size(80.dp)) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context).data(uri).crossfade(true).build(),
+                                            contentDescription = null, contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                                        )
+                                        IconButton(onClick = { pendingAdditionalPhotos = pendingAdditionalPhotos - uri }, modifier = Modifier.align(Alignment.TopEnd).size(26.dp)) {
+                                            Icon(Icons.Default.Cancel, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = { additionalGalleryLauncher?.launch("image/*") },
+                            enabled = !isLoading && totalPhotos < 5,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.AddPhotoAlternate, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (totalPhotos >= 5) "Límite de 5 fotos alcanzado" else "Agregar fotos adicionales")
+                        }
+                    }
+                }
+            }
+            // ── End Additional Photos ──────────────────────────────────────
 
             AnimatedVisibility(visible, enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { -40 }) {
                 Text("Información Básica", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -578,10 +699,14 @@ fun PetDetailContent(
                         if (petName.isBlank()) { nameError = "El nombre es requerido"; return@Button }
                         if (speciesValue.isBlank()) { speciesError = "Selecciona la especie"; return@Button }
 
+                        // For new pets, prompt for a main photo if none was selected (only once)
+                        if (!isEditMode && photoUri == null && !photoPromptDismissed) {
+                            showPhotoRequiredDialog = true
+                            return@Button
+                        }
+
                         if (photoUri != null) {
                             if (currentPetId > 0) PetPhotoStore.save(context, currentPetId, photoUri.toString())
-                        } else if (currentPetId > 0) {
-                            PetPhotoStore.delete(context, currentPetId)
                         }
 
                         // Persist medication reminders locally before the API call
@@ -598,6 +723,7 @@ fun PetDetailContent(
                             petAllergies.trim().ifEmpty { null },
                             medicalNotes.trim().ifEmpty { null },
                             photoUri?.toString(),
+                            pendingAdditionalPhotos,
                             context
                         )
                     },
@@ -632,7 +758,7 @@ fun PetDetailScreenCreatePreview() {
             isEditMode = false,
             currentPetId = -1L,
             onBack = {},
-            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }
@@ -668,7 +794,7 @@ fun PetDetailScreenEditPreview() {
             isEditMode = true,
             currentPetId = 1L,
             onBack = {},
-            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
+            onSave = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> }
         )
     }
 }

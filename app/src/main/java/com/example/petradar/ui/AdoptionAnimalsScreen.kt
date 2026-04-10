@@ -4,9 +4,10 @@ package com.example.petradar.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,41 +23,40 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.petradar.api.AdoptionAnimalViewModel
-import com.example.petradar.utils.AdoptionPhotoStore
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.viewmodel.AdoptionAnimalListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-/**
- * Screen that displays the list of adoption animals.
- *
- * Features:
- *  - Animal list in [LazyColumn] with photo (URL or default emoji), name, species, status and breed.
- *  - Floating action button "Nuevo animal" that navigates to the creation form.
- *  - Pull-to-refresh to reload the list from the API.
- *  - Confirmation dialog before deleting an animal.
- *  - Snackbar for displaying network errors.
- *
- * @param viewModel  ViewModel with the adoption animal list and deletion logic.
- * @param onAddAnimal Callback to navigate to create a new adoption animal.
- * @param onEditAnimal Callback to navigate to edit the given adoption animal.
- * @param onBack      Callback to return to the previous screen.
- */
 fun AdoptionAnimalsScreen(
     viewModel: AdoptionAnimalListViewModel,
+    currentUserId: Long,
     onAddAnimal: () -> Unit,
+    onAnimalClick: (AdoptionAnimalViewModel) -> Unit,
+    onAdoptAnimal: (AdoptionAnimalViewModel) -> Unit,
     onEditAnimal: (AdoptionAnimalViewModel) -> Unit,
+    onDeleteAnimal: (AdoptionAnimalViewModel) -> Unit,
     onBack: () -> Unit
 ) {
     val animals by viewModel.animals.observeAsState(emptyList())
+
+    // Show all Available animals + all the user's own (regardless of status), deduplicated
+    val displayAnimals = remember(animals, currentUserId) {
+        animals.filter {
+            it.status.equals("Available", ignoreCase = true) || it.shelterId == currentUserId
+        }.distinctBy { it.id }
+    }
+
     val isLoadingState by viewModel.isLoading.observeAsState(false)
     val isLoading = isLoadingState
     val errorMessage by viewModel.errorMessage.observeAsState()
+    val adoptSuccess by viewModel.adoptSuccess.observeAsState(null)
 
+    var animalToAdopt by remember { mutableStateOf<AdoptionAnimalViewModel?>(null) }
+    var showAdoptDialog by remember { mutableStateOf(false) }
     var animalToDelete by remember { mutableStateOf<AdoptionAnimalViewModel?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -67,24 +67,51 @@ fun AdoptionAnimalsScreen(
     LaunchedEffect(errorMessage) {
         errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
+    LaunchedEffect(adoptSuccess) {
+        if (adoptSuccess == true) {
+            snackbarHostState.showSnackbar("¡Solicitud de adopción enviada con éxito!")
+        }
+    }
 
+    // Adopt confirmation dialog
+    if (showAdoptDialog && animalToAdopt != null) {
+        AlertDialog(
+            onDismissRequest = { showAdoptDialog = false; animalToAdopt = null },
+            icon = { Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Confirmar adopción") },
+            text = { Text("¿Deseas iniciar la adopción de ${animalToAdopt?.name ?: "este animal"}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    animalToAdopt?.let(onAdoptAnimal)
+                    showAdoptDialog = false
+                    animalToAdopt = null
+                }) { Text("Adoptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAdoptDialog = false; animalToAdopt = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Delete confirmation dialog
     if (showDeleteDialog && animalToDelete != null) {
         AlertDialog(
-            onDismissRequest = { },
-            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text("Eliminar animal") },
-            text = { Text("¿Estás seguro de que deseas eliminar a ${animalToDelete?.name ?: "este animal"}?") },
+            onDismissRequest = { showDeleteDialog = false; animalToDelete = null },
+            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Eliminar publicación") },
+            text = { Text("¿Seguro que deseas eliminar la publicación de ${animalToDelete?.name ?: "este animal"}? Esta acción no se puede deshacer.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        animalToDelete?.let { a -> viewModel.deleteAnimal(a.id) }
+                        animalToDelete?.let(onDeleteAnimal)
+                        showDeleteDialog = false
                         animalToDelete = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteDialog = false; animalToDelete = null }) { Text("Cancelar") }
             }
         )
     }
@@ -105,7 +132,7 @@ fun AdoptionAnimalsScreen(
                 ExtendedFloatingActionButton(
                     onClick = onAddAnimal,
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                    text = { Text("Nuevo animal") },
+                    text = { Text("Subir animal") },
                 )
             }
         },
@@ -114,34 +141,38 @@ fun AdoptionAnimalsScreen(
     ) { paddingValues ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = {
-                isRefreshing = true
-                viewModel.loadAnimals()
-            },
+            onRefresh = { isRefreshing = true; viewModel.loadAnimals() },
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
-                    isLoading && animals.isEmpty() -> {
+                    isLoading && displayAnimals.isEmpty() -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
-                    animals.isEmpty() -> {
+                    displayAnimals.isEmpty() -> {
                         EmptyAdoptionMessage(modifier = Modifier.align(Alignment.Center))
                     }
                     else -> {
-                        LazyColumn(
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            contentPadding = PaddingValues(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(items = animals, key = { animal -> animal.id }) { animal ->
-                                AdoptionAnimalCard(
+                            items(items = displayAnimals, key = { it.id }) { animal ->
+                                val isOwner = animal.shelterId == currentUserId
+                                AdoptionAnimalGridCard(
                                     animal = animal,
+                                    isOwner = isOwner,
+                                    canAdopt = currentUserId > 0 && !isOwner,
+                                    onClick = { onAnimalClick(animal) },
+                                    onAdopt = { animalToAdopt = animal; showAdoptDialog = true },
                                     onEdit = { onEditAnimal(animal) },
-                                    onDelete = { animalToDelete = animal; }
+                                    onDelete = { animalToDelete = animal; showDeleteDialog = true }
                                 )
                             }
-                            item { Spacer(Modifier.height(80.dp)) }
+                            item(span = { GridItemSpan(2) }) { Spacer(Modifier.height(80.dp)) }
                         }
                     }
                 }
@@ -150,7 +181,6 @@ fun AdoptionAnimalsScreen(
     }
 }
 
-/** Centred empty-state message shown when there are no adoption animals. */
 @Composable
 private fun EmptyAdoptionMessage(modifier: Modifier = Modifier) {
     Column(
@@ -165,29 +195,26 @@ private fun EmptyAdoptionMessage(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "No hay animales en adopción",
+            text = "No hay animales disponibles",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
         )
         Text(
-            text = "Toca + para agregar un nuevo animal",
+            text = "Vuelve a intentar más tarde",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
         )
     }
 }
 
-/**
- * Card for an individual adoption animal within the list.
- *
- * Displays the avatar (API URL or default emoji), the name, species/breed,
- * status and sex of the animal.
- * Includes edit (pencil) and delete (trash) buttons.
- */
 @Composable
-private fun AdoptionAnimalCard(
+private fun AdoptionAnimalGridCard(
     animal: AdoptionAnimalViewModel,
+    isOwner: Boolean,
+    canAdopt: Boolean,
+    onClick: () -> Unit,
+    onAdopt: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -209,86 +236,145 @@ private fun AdoptionAnimalCard(
         "reserved" -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
     }
-    val speciesEmoji = if (animal.species?.lowercase() == "cat") "🐱" else "🐶"
-    val animalBreed = animal.breed?.takeIf { it.isNotBlank() } ?: "Raza no especificada"
-
-    // Resolve photo: local store first, then API URL
-    val photoUriStr = remember(animal.id) {
-        AdoptionPhotoStore.get(context, animal.id) ?: animal.photoURL?.takeIf { it.isNotBlank() }
+    val animalBreed = animal.breed?.takeIf { it.isNotBlank() } ?: "Sin raza"
+    val ageText = animal.approximateAge?.let { age ->
+        if (age < 1.0 && age > 0.0) {
+            val months = (age * 12).toInt()
+            "$months ${if (months == 1) "mes" else "meses"}"
+        } else {
+            val years = if (age == age.toLong().toDouble()) age.toLong().toString() else age.toString()
+            "$years ${if (age == 1.0) "año" else "años"}"
+        }
     }
 
+    val photoUrl = PetImageUrlResolver.adoptionMainPictureEndpoint(animal.id)
+
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
+            // Photo
             Box(
-                modifier = Modifier.size(56.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
-                if (photoUriStr != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(photoUriStr).crossfade(true).build(),
-                        contentDescription = animal.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape)
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(photoUrl)
+                        .crossfade(true)
+                        .memoryCacheKey(photoUrl)
+                        .diskCacheKey(photoUrl)
+                        .build(),
+                    contentDescription = animal.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                )
+                // Status badge
+                Surface(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = statusColor.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = statusLabel,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = statusColor,
+                        fontWeight = FontWeight.SemiBold
                     )
-                } else {
-                    Text(text = speciesEmoji, fontSize = 28.sp)
+                }
+                // "Mi publicación" badge for owner
+                if (isOwner) {
+                    Surface(
+                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text(
+                            text = "Mía",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
+
+            // Info
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = animal.name ?: "Sin nombre",
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1
                 )
-                // Species · Breed · Age
-                val ageText = animal.approximateAge?.let { age ->
-                    if (age < 1.0 && age > 0.0) {
-                        val months = (age * 12).toInt()
-                        "$months ${if (months == 1) "mes" else "meses"}"
-                    } else {
-                        val years = if (age == age.toLong().toDouble()) age.toLong().toString() else age.toString()
-                        "$years ${if (age == 1.0) "año" else "años"}"
+                Text(
+                    text = "$speciesLabel · $animalBreed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    maxLines = 1
+                )
+                if (ageText != null) {
+                    Text(
+                        text = ageText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
+
+            // Action buttons
+            if (isOwner) {
+                // Owner: edit + delete (icon-only)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .padding(bottom = 4.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Editar",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Eliminar",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-                val subtitle = buildString {
-                    append("$speciesLabel · $animalBreed")
-                    if (ageText != null) append(" · $ageText")
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-                Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = statusColor,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Column {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+            } else {
+                // Other users: adopt button
+                Button(
+                    onClick = onAdopt,
+                    enabled = canAdopt && animal.status.equals("Available", ignoreCase = true),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp)
+                        .padding(bottom = 10.dp)
+                ) {
+                    Text("Adoptar", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
     }
 }
-
-
-
-
-

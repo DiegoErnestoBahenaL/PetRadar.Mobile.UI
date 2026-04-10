@@ -123,7 +123,6 @@ fun RegisterScreen(
             cameraLauncher.launch(uri)
         }
     }
-
     var visible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
