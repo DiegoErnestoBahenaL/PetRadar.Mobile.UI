@@ -1,3 +1,5 @@
+@file:Suppress("ClickableViewAccessibility")
+
 package com.example.petradar.ui
 
 import android.Manifest
@@ -362,7 +364,7 @@ fun LostPetReportScreen(
                                 val url = PetImageUrlResolver.petAdditionalPhotoUrl(loadedPetId, photoName)
                                 AsyncImage(
                                     model = ImageRequest.Builder(context).data(url).crossfade(true)
-                                        .memoryCacheKey(url).diskCacheKey(url).build(),
+                                        .build(),
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.size(88.dp).clip(RoundedCornerShape(10.dp))
@@ -408,7 +410,10 @@ fun LostPetReportScreen(
                                 MotionEvent.ACTION_DOWN,
                                 MotionEvent.ACTION_MOVE -> view.parent?.requestDisallowInterceptTouchEvent(true)
                                 MotionEvent.ACTION_UP,
-                                MotionEvent.ACTION_CANCEL -> view.parent?.requestDisallowInterceptTouchEvent(false)
+                                MotionEvent.ACTION_CANCEL -> {
+                                    view.parent?.requestDisallowInterceptTouchEvent(false)
+                                    view.performClick()
+                                }
                             }
                             false
                         }

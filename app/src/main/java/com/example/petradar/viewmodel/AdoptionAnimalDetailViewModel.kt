@@ -2,6 +2,7 @@ package com.example.petradar.viewmodel
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -243,7 +244,7 @@ class AdoptionAnimalDetailViewModel : ViewModel() {
 
                     if (newId > 0 && context != null) {
                         if (!photoUri.isNullOrBlank()) {
-                            uploadMainPictureInternal(newId, Uri.parse(photoUri), context)
+                            uploadMainPictureInternal(newId, photoUri.toUri(), context)
                         }
                         if (additionalPhotoUris.isNotEmpty()) {
                             uploadAdditionalPhotosInternal(newId, additionalPhotoUris, context)
@@ -288,7 +289,7 @@ class AdoptionAnimalDetailViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     if (context != null) {
                         if (!photoUri.isNullOrBlank()) {
-                            uploadMainPictureInternal(animalId, Uri.parse(photoUri), context)
+                            uploadMainPictureInternal(animalId, photoUri.toUri(), context)
                         }
                         if (additionalPhotoUris.isNotEmpty()) {
                             uploadAdditionalPhotosInternal(animalId, additionalPhotoUris, context)

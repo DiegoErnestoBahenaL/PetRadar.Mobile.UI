@@ -431,8 +431,6 @@ fun AppointmentCard(
                         model = ImageRequest.Builder(context)
                             .data(petPhotoUri)
                             .crossfade(true)
-                            .memoryCacheKey(petPhotoUri)
-                            .diskCacheKey(petPhotoUri)
                             .build(),
                         contentDescription = pet?.name,
                         contentScale = ContentScale.Crop,

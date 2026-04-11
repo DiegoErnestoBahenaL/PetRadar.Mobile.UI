@@ -268,8 +268,6 @@ private fun AdoptionAnimalGridCard(
                     model = ImageRequest.Builder(context)
                         .data(photoUrl)
                         .crossfade(true)
-                        .memoryCacheKey(photoUrl)
-                        .diskCacheKey(photoUrl)
                         .build(),
                     contentDescription = animal.name,
                     contentScale = ContentScale.Crop,

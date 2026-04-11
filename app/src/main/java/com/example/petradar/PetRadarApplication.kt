@@ -28,8 +28,8 @@ class PetRadarApplication : Application() {
         Coil.setImageLoader(
             ImageLoader.Builder(this)
                 .okHttpClient(RetrofitClient.imageHttpClient)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .memoryCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .memoryCachePolicy(CachePolicy.DISABLED)
                 .crossfade(true)
                 .build()
         )

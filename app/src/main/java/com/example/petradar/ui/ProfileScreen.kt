@@ -74,13 +74,9 @@ fun ProfileScreen(
 
     var editMode by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
-    // Incremented after every successful photo upload to bust Coil's cache.
-    var photoVersion by remember { mutableStateOf(0) }
     LaunchedEffect(isLoading) { if (!isLoading) isRefreshing = false }
 
-    // Build the profile picture URL directly from the userId + API endpoint.
-    // A cache-busting query parameter ensures Coil re-fetches after a new upload.
-    val pictureUrl = "${com.example.petradar.api.RetrofitClient.BASE_URL}api/Users/$userId/profilepicture?v=$photoVersion"
+    val pictureUrl = "${com.example.petradar.api.RetrofitClient.BASE_URL}api/Users/$userId/profilepicture"
 
     var firstName   by remember { mutableStateOf("") }
     var lastName    by remember { mutableStateOf("") }
@@ -147,7 +143,6 @@ fun ProfileScreen(
         when (photoUploadSuccess) {
             true -> {
                 viewModel.clearPhotoUploadSuccess()
-                photoVersion++ // bust Coil cache so the new image is fetched
                 snackbarHostState.showSnackbar("Foto de perfil actualizada ✓")
             }
             false -> viewModel.clearPhotoUploadSuccess()
@@ -298,8 +293,6 @@ private fun ProfileAvatar(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(photoUrl)
                         .crossfade(true)
-                        .memoryCacheKey(photoUrl)
-                        .diskCacheKey(photoUrl)
                         .build(),
                     contentDescription = "Foto de perfil",
                     contentScale = ContentScale.Crop,

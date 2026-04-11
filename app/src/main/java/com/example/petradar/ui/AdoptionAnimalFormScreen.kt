@@ -457,7 +457,7 @@ fun AdoptionAnimalFormScreen(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(speciesExpanded) },
                                 isError = speciesError != null,
                                 supportingText = speciesError?.let { err -> { Text(err) } },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = speciesExpanded, onDismissRequest = { speciesExpanded = false }) {
@@ -474,7 +474,7 @@ fun AdoptionAnimalFormScreen(
                         ExposedDropdownMenuBox(expanded = sexExpanded, onExpandedChange = { sexExpanded = it }) {
                             OutlinedTextField(value = sexLabel, onValueChange = {}, readOnly = true, label = { Text("Sexo") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sexExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sexExpanded, onDismissRequest = { sexExpanded = false }) {
                                 sexOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sexLabel = label; sexValue = value; sexExpanded = false })
@@ -484,7 +484,7 @@ fun AdoptionAnimalFormScreen(
                         ExposedDropdownMenuBox(expanded = sizeExpanded, onExpandedChange = { sizeExpanded = it }) {
                             OutlinedTextField(value = sizeLabel, onValueChange = {}, readOnly = true, label = { Text("Tamaño") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sizeExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sizeExpanded, onDismissRequest = { sizeExpanded = false }) {
                                 sizeOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sizeLabel = label; sizeValue = value; sizeExpanded = false })
@@ -530,7 +530,7 @@ fun AdoptionAnimalFormScreen(
                                     readOnly = true,
                                     label = { Text("Unidad") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ageUnitExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                     enabled = !isLoading
                                 )
                                 ExposedDropdownMenu(expanded = ageUnitExpanded, onDismissRequest = { ageUnitExpanded = false }) {
@@ -619,7 +619,7 @@ fun AdoptionAnimalFormScreen(
                                     value = statusLabel, onValueChange = {}, readOnly = true,
                                     label = { Text("Estado") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(statusExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                     enabled = !isLoading
                                 )
                                 ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
