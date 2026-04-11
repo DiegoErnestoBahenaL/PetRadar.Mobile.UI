@@ -241,8 +241,6 @@ private fun PetCard(
                     model = ImageRequest.Builder(context)
                         .data(photoUriStr)
                         .crossfade(true)
-                        .memoryCacheKey(photoUriStr)
-                        .diskCacheKey(photoUriStr)
                         .build(),
                     contentDescription = pet.name,
                     contentScale = ContentScale.Crop,

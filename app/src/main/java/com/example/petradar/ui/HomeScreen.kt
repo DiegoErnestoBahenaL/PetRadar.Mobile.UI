@@ -145,8 +145,6 @@ fun HomeScreen(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(profilePhotoUrl)
                                         .crossfade(true)
-                                        .memoryCacheKey(profilePhotoUrl)
-                                        .diskCacheKey(profilePhotoUrl)
                                         .build(),
                                     contentDescription = "Foto de perfil",
                                     contentScale = ContentScale.Crop,
@@ -326,8 +324,6 @@ fun HomeScreen(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(profilePhotoUrl)
                                             .crossfade(true)
-                                            .memoryCacheKey(profilePhotoUrl)
-                                            .diskCacheKey(profilePhotoUrl)
                                             .build(),
                                         contentDescription = "Foto de perfil",
                                         contentScale = ContentScale.Crop,

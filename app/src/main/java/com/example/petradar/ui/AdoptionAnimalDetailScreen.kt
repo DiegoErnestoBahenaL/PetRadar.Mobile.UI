@@ -125,8 +125,6 @@ fun AdoptionAnimalDetailScreen(
                     model = ImageRequest.Builder(context)
                         .data(url)
                         .crossfade(true)
-                        .memoryCacheKey(url)
-                        .diskCacheKey(url)
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
@@ -221,8 +219,6 @@ fun AdoptionAnimalDetailScreen(
                     model = ImageRequest.Builder(context)
                         .data(mainPhotoUrl)
                         .crossfade(true)
-                        .memoryCacheKey(mainPhotoUrl)
-                        .diskCacheKey(mainPhotoUrl)
                         .build(),
                     contentDescription = a.name,
                     contentScale = ContentScale.Crop,
@@ -285,8 +281,6 @@ fun AdoptionAnimalDetailScreen(
                                 model = ImageRequest.Builder(context)
                                     .data(photoUrl)
                                     .crossfade(true)
-                                    .memoryCacheKey(photoUrl)
-                                    .diskCacheKey(photoUrl)
                                     .build(),
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,

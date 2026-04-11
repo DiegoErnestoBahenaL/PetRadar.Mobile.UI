@@ -212,8 +212,8 @@ private fun MedicationDialog(
 ) {
     var medicineName by remember { mutableStateOf(initial?.medicineName ?: "") }
     var notes        by remember { mutableStateOf(initial?.notes ?: "") }
-    var hour         by remember { mutableStateOf(initial?.hour ?: 8) }
-    var minute       by remember { mutableStateOf(initial?.minute ?: 0) }
+    var hour         by remember { mutableIntStateOf(initial?.hour ?: 8) }
+    var minute       by remember { mutableIntStateOf(initial?.minute ?: 0) }
     var freqType     by remember { mutableStateOf(initial?.frequencyType ?: "days") }
     var freqValue    by remember { mutableStateOf(initial?.frequencyValue?.toString() ?: "1") }
 

@@ -24,19 +24,17 @@ object PetImageUrlResolver {
     /**
      * Deterministic endpoint that always points to the latest pet main picture.
      */
-    fun mainPictureEndpoint(petId: Long, cacheBuster: Int? = null): String {
+    fun mainPictureEndpoint(petId: Long): String {
         val base = RetrofitClient.BASE_URL.trimEnd('/')
-        val suffix = cacheBuster?.let { "?v=$it" } ?: ""
-        return "$base/api/UserPets/$petId/mainpicture$suffix"
+        return "$base/api/UserPets/$petId/mainpicture"
     }
 
     /**
      * Deterministic endpoint that always points to the latest adoption animal main picture.
      */
-    fun adoptionMainPictureEndpoint(animalId: Long, cacheBuster: Int? = null): String {
+    fun adoptionMainPictureEndpoint(animalId: Long): String {
         val base = RetrofitClient.BASE_URL.trimEnd('/')
-        val suffix = cacheBuster?.let { "?v=$it" } ?: ""
-        return "$base/api/AdoptionAnimals/$animalId/mainpicture$suffix"
+        return "$base/api/AdoptionAnimals/$animalId/mainpicture"
     }
 
     /** URL for a specific additional photo of a UserPet. */

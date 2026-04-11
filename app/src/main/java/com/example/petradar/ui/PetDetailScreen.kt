@@ -71,7 +71,7 @@ import com.example.petradar.api.UserPetViewModel
  * Pet photo:
  *  - The user can pick an image from the gallery or camera.
  *  - The photo is uploaded to the API via PUT /api/UserPets/{id}/mainpicture
- *    and is fetched from GET /api/UserPets/{id}/mainpicture with cache busting.
+ *    and is fetched from GET /api/UserPets/{id}/mainpicture.
  *
  * When [PetDetailViewModel.saveSuccess] is true, closes the screen.
  *
@@ -161,10 +161,6 @@ fun PetDetailContent(
     var photoUri by remember {
         mutableStateOf<Uri?>(null)
     }
-    // Version counter for cache busting when the pet's main picture is uploaded
-    var photoVersion by remember { mutableStateOf(0) }
-
-
     // Temporary file URI for camera captures
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
@@ -266,7 +262,7 @@ fun PetDetailContent(
     val sizeOptions = listOf("Pequeño" to "Small", "Mediano" to "Medium", "Grande" to "Large")
 
     val pictureUrl = if (currentPetId > 0) {
-        PetImageUrlResolver.mainPictureEndpoint(currentPetId, photoVersion)
+        PetImageUrlResolver.mainPictureEndpoint(currentPetId)
     } else null
 
     LaunchedEffect(Unit) { visible = true }
@@ -295,8 +291,6 @@ fun PetDetailContent(
         sizeLabel = foundSize?.first ?: p.size ?: ""
         sizeValue = foundSize?.second ?: p.size ?: ""
 
-        // Note: photoUri is now managed as a selection UI state, not for display
-        // The photo URL for display is built from the API endpoint with cache busting
     }
 
     LaunchedEffect(errorMessage) {
@@ -306,9 +300,6 @@ fun PetDetailContent(
 
     LaunchedEffect(saveSuccess) {
         if (saveSuccess && photoUri != null && currentPetId > 0) {
-            // Photo was uploaded; increment version to bust the cache
-            photoVersion++
-            // Clear the selection state since the photo is now on the server
             photoUri = null
         }
         if (saveSuccess) onBack()
@@ -469,8 +460,6 @@ fun PetDetailContent(
                                 model = ImageRequest.Builder(context)
                                     .data(displayImageUrl)
                                     .crossfade(true)
-                                    .memoryCacheKey(displayImageUrl)
-                                    .diskCacheKey(displayImageUrl)
                                     .build(),
                                 contentDescription = "Foto de mascota",
                                 contentScale = ContentScale.Crop,
@@ -526,7 +515,7 @@ fun PetDetailContent(
                                     val url = com.example.petradar.utils.PetImageUrlResolver.petAdditionalPhotoUrl(currentPetId, photoName)
                                     Box(modifier = Modifier.size(80.dp)) {
                                         AsyncImage(
-                                            model = ImageRequest.Builder(context).data(url).crossfade(true).memoryCacheKey(url).diskCacheKey(url).build(),
+                                            model = ImageRequest.Builder(context).data(url).crossfade(true).build(),
                                             contentDescription = null, contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
                                         )
