@@ -236,6 +236,7 @@ private fun PetCard(
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
+                Text(text = speciesEmoji, fontSize = 28.sp)
                 AsyncImage(
                     model = ImageRequest.Builder(context)
                         .data(photoUriStr)

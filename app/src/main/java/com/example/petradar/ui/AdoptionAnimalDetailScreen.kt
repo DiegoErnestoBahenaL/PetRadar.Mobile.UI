@@ -171,7 +171,7 @@ fun AdoptionAnimalDetailScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            if (animal != null && currentUserId > 0) {
+            if (animal != null && currentUserId > 0 && !isOwner) {
                 Surface(shadowElevation = 8.dp) {
                     Button(
                         onClick = { showAdoptDialog = true },

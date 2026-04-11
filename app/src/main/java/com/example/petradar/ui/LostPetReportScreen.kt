@@ -153,6 +153,18 @@ fun LostPetReportScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean -> if (success && cameraImageUri != null) mainPhotoUri = cameraImageUri }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "report_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+            cameraImageUri = uri
+            mainCameraLauncher.launch(uri)
+        }
+    }
+
     fun launchCamera() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -162,6 +174,8 @@ fun LostPetReportScreen(
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
             cameraImageUri = uri
             mainCameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -212,6 +226,19 @@ fun LostPetReportScreen(
         }
     }
 
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            tryUseCurrentLocation(context) { point, error ->
+                if (point != null) selectPoint(point)
+                else locationError = error ?: "No se pudo obtener tu ubicación actual."
+            }
+        } else {
+            locationError = "Se denegó el permiso de ubicación."
+        }
+    }
+
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -236,7 +263,7 @@ fun LostPetReportScreen(
                 }
             }
         } else {
-            locationError = "Se denegó el permiso de ubicación."
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -455,7 +482,7 @@ fun LostPetReportScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { requestCurrentLocation() }) {
                     Icon(Icons.Default.MyLocation, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Usar mi ubicación actual")
                 }
             }
@@ -595,7 +622,7 @@ fun LostPetReportScreen(
                     CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
                 } else {
                     Icon(Icons.Default.Report, contentDescription = null)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Publicar reporte")
                 }
             }

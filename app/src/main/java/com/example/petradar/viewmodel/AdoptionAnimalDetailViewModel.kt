@@ -11,7 +11,9 @@ import com.example.petradar.api.AdoptionAnimalCreateModel
 import com.example.petradar.api.AdoptionAnimalUpdateModel
 import com.example.petradar.api.AdoptionAnimalViewModel
 import com.example.petradar.repository.AdoptionAnimalRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -50,7 +52,7 @@ class AdoptionAnimalDetailViewModel : ViewModel() {
     val errorMessage: LiveData<String?> = _errorMessage
 
     private val _saveSuccess = MutableLiveData<Boolean>()
-    /** Emits true after the animal and any pending photos are successfully saved. */
+    /** Emits true after a successful create or update; photo uploads are best-effort and do not affect this flag. */
     val saveSuccess: LiveData<Boolean> = _saveSuccess
 
     private val _additionalPhotos = MutableLiveData<List<String>>(emptyList())
@@ -326,16 +328,18 @@ class AdoptionAnimalDetailViewModel : ViewModel() {
     }
 
     /** Reads a URI and builds a [MultipartBody.Part] for upload. Returns null on failure. */
-    private fun buildFilePart(
+    private suspend fun buildFilePart(
         context: Context,
         uri: Uri,
         fieldName: String,
         fileName: String
-    ): MultipartBody.Part? = runCatching {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
-        val mediaType = context.contentResolver.getType(uri)?.toMediaTypeOrNull()
-            ?: "image/jpeg".toMediaTypeOrNull()
-        val requestBody = bytes.toRequestBody(mediaType)
-        MultipartBody.Part.createFormData(fieldName, fileName, requestBody)
-    }.getOrNull()
+    ): MultipartBody.Part? = withContext(Dispatchers.IO) {
+        runCatching {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            val mediaType = context.contentResolver.getType(uri)?.toMediaTypeOrNull()
+                ?: "image/jpeg".toMediaTypeOrNull()
+            val requestBody = bytes.toRequestBody(mediaType)
+            MultipartBody.Part.createFormData(fieldName, fileName, requestBody)
+        }.getOrNull()
+    }
 }

@@ -12,7 +12,9 @@ import com.example.petradar.api.UserPetViewModel
 import com.example.petradar.repository.PetRepository
 import com.example.petradar.repository.ReportRepository
 import com.example.petradar.utils.PetImageUrlResolver
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -57,7 +59,7 @@ class LostPetReportViewModel : ViewModel() {
                     _errorMessage.value = "No se pudo cargar la mascota (${response.code()})"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexion: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -95,7 +97,7 @@ class LostPetReportViewModel : ViewModel() {
                     _errorMessage.value = "No se pudo crear el reporte (${response.code()})"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexion: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -105,21 +107,23 @@ class LostPetReportViewModel : ViewModel() {
     /** Downloads each pet additional photo and re-uploads it to the report's endpoint. */
     private suspend fun copyPetPhotosToReport(petId: Long, photoNames: List<String>, reportId: Long) {
         val api = RetrofitClient.apiService
-        val parts = photoNames.mapNotNull { photoName ->
-            runCatching {
-                val url = PetImageUrlResolver.petAdditionalPhotoUrl(petId, photoName)
-                val downloadResponse = api.downloadFile(url)
-                if (!downloadResponse.isSuccessful) return@mapNotNull null
-                val bytes = downloadResponse.body()?.bytes() ?: return@mapNotNull null
-                val extension = photoName.substringAfterLast('.', "jpg").lowercase()
-                val mimeType = when (extension) {
-                    "png" -> "image/png"
-                    "webp" -> "image/webp"
-                    else -> "image/jpeg"
-                }
-                val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-                MultipartBody.Part.createFormData("files", "report_$photoName", requestBody)
-            }.getOrNull()
+        val parts = withContext(Dispatchers.IO) {
+            photoNames.mapNotNull { photoName ->
+                runCatching {
+                    val url = PetImageUrlResolver.petAdditionalPhotoUrl(petId, photoName)
+                    val downloadResponse = api.downloadFile(url)
+                    if (!downloadResponse.isSuccessful) return@mapNotNull null
+                    val bytes = downloadResponse.body()?.bytes() ?: return@mapNotNull null
+                    val extension = photoName.substringAfterLast('.', "jpg").lowercase()
+                    val mimeType = when (extension) {
+                        "png" -> "image/png"
+                        "webp" -> "image/webp"
+                        else -> "image/jpeg"
+                    }
+                    val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+                    MultipartBody.Part.createFormData("files", "report_$photoName", requestBody)
+                }.getOrNull()
+            }
         }
         if (parts.isEmpty()) return
         val uploadResponse = reportRepository.uploadAdditionalPhotos(reportId, parts)
@@ -136,20 +140,21 @@ class LostPetReportViewModel : ViewModel() {
 
     private suspend fun uploadReportMainPicture(reportId: Long, uriString: String, context: Context) {
         val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
-        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val extension = when {
-            mimeType.contains("png", ignoreCase = true) -> "png"
-            mimeType.contains("webp", ignoreCase = true) -> "webp"
-            else -> "jpg"
-        }
-
-        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-        val filePart = MultipartBody.Part.createFormData(
-            name = "file",
-            filename = "report_main.$extension",
-            body = requestBody
-        )
+        val filePart = withContext(Dispatchers.IO) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val extension = when {
+                mimeType.contains("png", ignoreCase = true) -> "png"
+                mimeType.contains("webp", ignoreCase = true) -> "webp"
+                else -> "jpg"
+            }
+            val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+            MultipartBody.Part.createFormData(
+                name = "file",
+                filename = "report_main.$extension",
+                body = requestBody
+            )
+        } ?: return
 
         val uploadResponse = reportRepository.uploadMainPicture(reportId, filePart)
         if (!uploadResponse.isSuccessful) {

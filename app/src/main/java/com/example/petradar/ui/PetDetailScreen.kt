@@ -181,7 +181,7 @@ fun PetDetailContent(
             contract = ActivityResultContracts.GetMultipleContents()
         ) { uris: List<Uri> ->
             if (uris.isNotEmpty()) {
-                val totalAllowed = 5 - existingAdditionalPhotos.size - pendingAdditionalPhotos.size
+                val totalAllowed = (5 - existingAdditionalPhotos.size - pendingAdditionalPhotos.size).coerceAtLeast(0)
                 pendingAdditionalPhotos = pendingAdditionalPhotos + uris.take(totalAllowed)
             }
         }
@@ -197,6 +197,20 @@ fun PetDetailContent(
         }
     } else null
 
+    val cameraPermissionLauncher = if (!isInPreview) {
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                    .let { File(it, "pet_${System.currentTimeMillis()}.jpg") }
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
+                cameraImageUri = uri
+                cameraLauncher?.launch(uri)
+            }
+        }
+    } else null
+
     fun launchCamera() {
         if (isInPreview) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -205,6 +219,8 @@ fun PetDetailContent(
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
             cameraImageUri = uri
             cameraLauncher?.launch(uri)
+        } else {
+            cameraPermissionLauncher?.launch(Manifest.permission.CAMERA)
         }
     }
 
