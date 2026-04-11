@@ -2,6 +2,7 @@ package com.example.petradar.api
 
 import com.example.petradar.api.models.*
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -199,6 +200,34 @@ interface ApiService {
         @Part file: MultipartBody.Part
     ): Response<Unit>
 
+    /**
+     * Retrieves all additional photo names for a pet.
+     * Endpoint: GET /api/UserPets/{id}/additionalphotos
+     */
+    @GET("api/UserPets/{id}/additionalphotos")
+    suspend fun getUserPetAdditionalPhotos(@Path("id") id: Long): Response<List<String>>
+
+    /**
+     * Uploads one or more additional photos for a pet.
+     * Endpoint: PUT /api/UserPets/{id}/additionalphotos
+     */
+    @Multipart
+    @PUT("api/UserPets/{id}/additionalphotos")
+    suspend fun uploadUserPetAdditionalPhotos(
+        @Path("id") id: Long,
+        @Part files: List<MultipartBody.Part>
+    ): Response<Unit>
+
+    /**
+     * Deletes a specific additional photo of a pet.
+     * Endpoint: DELETE /api/UserPets/{id}/additionalphotos/{photoName}
+     */
+    @DELETE("api/UserPets/{id}/additionalphotos/{photoName}")
+    suspend fun deleteUserPetAdditionalPhoto(
+        @Path("id") id: Long,
+        @Path("photoName") photoName: String
+    ): Response<Unit>
+
     // =========================================================================
     // Reports  ->  /api/Reports
     // =========================================================================
@@ -211,11 +240,59 @@ interface ApiService {
     suspend fun createReport(@Body request: ReportCreateModel): Response<Unit>
 
     /**
+     * Uploads or replaces the main picture of a report.
+     * Endpoint: PUT /api/Reports/{id}/mainpicture
+     *
+     * The image is sent as multipart/form-data with the field name "file".
+     */
+    @Multipart
+    @PUT("api/Reports/{id}/mainpicture")
+    suspend fun uploadReportMainPicture(
+        @Path("id") reportId: Long,
+        @Part file: MultipartBody.Part
+    ): Response<Unit>
+
+    /**
      * Retrieves all reports created by a specific user.
      * Endpoint: GET /api/Reports/user/{userId}
      */
     @GET("api/Reports/user/{userId}")
     suspend fun getReportsByUserId(@Path("userId") userId: Long): Response<List<ReportViewModel>>
+
+    /**
+     * Downloads a file from an arbitrary URL using the authenticated OkHttp client.
+     * Used internally to copy pet photos to a report.
+     */
+    @GET
+    suspend fun downloadFile(@Url url: String): Response<ResponseBody>
+
+    /**
+     * Retrieves all additional photo names for a report.
+     * Endpoint: GET /api/Reports/{id}/additionalphotos
+     */
+    @GET("api/Reports/{id}/additionalphotos")
+    suspend fun getReportAdditionalPhotos(@Path("id") id: Long): Response<List<String>>
+
+    /**
+     * Uploads one or more additional photos for a report.
+     * Endpoint: PUT /api/Reports/{id}/additionalphotos
+     */
+    @Multipart
+    @PUT("api/Reports/{id}/additionalphotos")
+    suspend fun uploadReportAdditionalPhotos(
+        @Path("id") id: Long,
+        @Part files: List<MultipartBody.Part>
+    ): Response<Unit>
+
+    /**
+     * Deletes a specific additional photo of a report.
+     * Endpoint: DELETE /api/Reports/{id}/additionalphotos/{photoName}
+     */
+    @DELETE("api/Reports/{id}/additionalphotos/{photoName}")
+    suspend fun deleteReportAdditionalPhoto(
+        @Path("id") id: Long,
+        @Path("photoName") photoName: String
+    ): Response<Unit>
 
     // =========================================================================
     // Veterinary Appointments  →  /api/VeterinaryAppointments
@@ -347,6 +424,60 @@ interface ApiService {
      */
     @DELETE("api/AdoptionAnimals/{id}")
     suspend fun deleteAdoptionAnimal(@Path("id") id: Long): Response<Unit>
+
+    /**
+     * Uploads or replaces the main picture of an adoption animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/mainpicture
+     *
+     * @param id   Adoption animal ID.
+     * @param file Image file as multipart part (field name "file").
+     * @return HTTP 204 No Content on success.
+     */
+    @Multipart
+    @PUT("api/AdoptionAnimals/{id}/mainpicture")
+    suspend fun uploadAdoptionAnimalMainPicture(
+        @Path("id") id: Long,
+        @Part file: MultipartBody.Part
+    ): Response<Unit>
+
+    /**
+     * Retrieves additional photo filenames for an adoption animal.
+     * Endpoint: GET /api/AdoptionAnimals/{id}/additionalphotos
+     *
+     * @param id Adoption animal ID.
+     * @return List of photo filenames (pass each to [com.example.petradar.utils.PetImageUrlResolver.adoptionAdditionalPhotoUrl]).
+     */
+    @GET("api/AdoptionAnimals/{id}/additionalphotos")
+    suspend fun getAdoptionAnimalAdditionalPhotos(@Path("id") id: Long): Response<List<String>>
+
+    /**
+     * Uploads one or more additional photos for an adoption animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/additionalphotos
+     *
+     * @param id    Adoption animal ID.
+     * @param files List of image files as multipart parts (field name "files").
+     * @return HTTP 204 No Content on success.
+     */
+    @Multipart
+    @PUT("api/AdoptionAnimals/{id}/additionalphotos")
+    suspend fun uploadAdoptionAnimalAdditionalPhotos(
+        @Path("id") id: Long,
+        @Part files: List<MultipartBody.Part>
+    ): Response<Unit>
+
+    /**
+     * Deletes a specific additional photo of an adoption animal.
+     * Endpoint: DELETE /api/AdoptionAnimals/{id}/additionalphotos/{photoName}
+     *
+     * @param id        Adoption animal ID.
+     * @param photoName File name of the photo to delete.
+     * @return HTTP 204 No Content on success.
+     */
+    @DELETE("api/AdoptionAnimals/{id}/additionalphotos/{photoName}")
+    suspend fun deleteAdoptionAnimalAdditionalPhoto(
+        @Path("id") id: Long,
+        @Path("photoName") photoName: String
+    ): Response<Unit>
 }
 
 // =============================================================================

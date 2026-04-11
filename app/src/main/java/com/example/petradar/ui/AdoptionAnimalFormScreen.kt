@@ -19,6 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,7 +42,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.petradar.utils.AdoptionPhotoStore
+import com.example.petradar.utils.PetImageUrlResolver
 import com.example.petradar.viewmodel.AdoptionAnimalDetailViewModel
 import androidx.core.net.toUri
 import java.io.File
@@ -81,27 +84,35 @@ fun AdoptionAnimalFormScreen(
     val errorMessage by viewModel.errorMessage.observeAsState()
     val saveSuccessRaw by viewModel.saveSuccess.observeAsState(false)
     val saveSuccess = saveSuccessRaw
+    val additionalPhotos by viewModel.additionalPhotos.observeAsState(emptyList())
 
     val snackbarHostState = remember { SnackbarHostState() }
     var visible by remember { mutableStateOf(false) }
 
     // ── Photo state ──────────────────────────────────────────────────────
-    var photoUri by remember {
-        mutableStateOf<Uri?>(
-            if (isEditMode && viewModel.currentAnimalId > 0)
-                AdoptionPhotoStore.get(context, viewModel.currentAnimalId)?.toUri()
-            else null
-        )
-    }
+    // photoUri = local URI selected by the user (replaces API photo on display)
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    // pendingAdditionalPhotos = new photos selected by the user, to upload after save
+    var pendingAdditionalPhotos by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     // Temporary file URI for camera captures
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
 
-    // Gallery picker
+    // Gallery picker (main photo)
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> if (uri != null) photoUri = uri }
+
+    // Gallery picker (additional photos — multiple selection)
+    val additionalGalleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val totalAllowed = (5 - additionalPhotos.size - pendingAdditionalPhotos.size).coerceAtLeast(0)
+            pendingAdditionalPhotos = pendingAdditionalPhotos + uris.take(totalAllowed)
+        }
+    }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -112,10 +123,9 @@ fun AdoptionAnimalFormScreen(
         }
     }
 
-    // Camera permission launcher
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { granted: Boolean ->
+    ) { granted ->
         if (granted) {
             val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
                 .let { File(it, "adoption_${System.currentTimeMillis()}.jpg") }
@@ -125,7 +135,6 @@ fun AdoptionAnimalFormScreen(
         }
     }
 
-    /** Launches the camera, requesting permission first if needed. */
     fun launchCamera() {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             val photoFile = File(context.cacheDir, "camera_photos").apply { mkdirs() }
@@ -185,7 +194,12 @@ fun AdoptionAnimalFormScreen(
     val sizeOptions = listOf("Pequeño" to "Small", "Mediano" to "Medium", "Grande" to "Large")
     val statusOptions = listOf("Disponible" to "Available", "Adoptado" to "Adopted", "Reservado" to "Reserved")
 
-    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(Unit) {
+        visible = true
+        if (isEditMode && viewModel.currentAnimalId > 0) {
+            viewModel.loadAdditionalPhotos(viewModel.currentAnimalId)
+        }
+    }
 
     LaunchedEffect(animalData) {
         val a = animalData ?: return@LaunchedEffect
@@ -237,15 +251,7 @@ fun AdoptionAnimalFormScreen(
         statusLabel = foundStatus?.first ?: a.status ?: ""
         statusValue = foundStatus?.second ?: a.status ?: ""
 
-        // Resolve photo: local store first, then API URL
-        if (photoUri == null) {
-            val stored = AdoptionPhotoStore.get(context, a.id)
-            photoUri = when {
-                stored != null -> stored.toUri()
-                !a.photoURL.isNullOrBlank() -> a.photoURL.toUri()
-                else -> null
-            }
-        }
+        // photoUri stays null; the deterministic API URL is shown as fallback in the UI
     }
 
     LaunchedEffect(errorMessage) {
@@ -254,16 +260,7 @@ fun AdoptionAnimalFormScreen(
     }
 
     LaunchedEffect(saveSuccess) {
-        if (saveSuccess) {
-            // Persist or remove the photo locally
-            val currentId = viewModel.currentAnimalId
-            if (photoUri != null && currentId > 0) {
-                AdoptionPhotoStore.save(context, currentId, photoUri.toString())
-            } else if (currentId > 0) {
-                AdoptionPhotoStore.delete(context, currentId)
-            }
-            onBack()
-        }
+        if (saveSuccess) onBack()
     }
 
     // Photo source dialog (Gallery vs Camera)
@@ -300,7 +297,7 @@ fun AdoptionAnimalFormScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (isEditMode) "Editar Animal" else "Nuevo Animal", fontWeight = FontWeight.Bold)
+                    Text(if (isEditMode) "Editar Animal" else "Publicar nuevo animal", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -321,6 +318,12 @@ fun AdoptionAnimalFormScreen(
         ) {
 
             // ── Photo Section ────────────────────────────────────────────
+            // Display priority: local URI selected by user → deterministic API URL → empty state
+            val apiPhotoUrl = if (isEditMode && viewModel.currentAnimalId > 0)
+                PetImageUrlResolver.adoptionMainPictureEndpoint(viewModel.currentAnimalId)
+            else null
+            val displayPhoto: Any? = photoUri ?: apiPhotoUrl
+
             AnimatedVisibility(visible, enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -30 }) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -335,10 +338,10 @@ fun AdoptionAnimalFormScreen(
                             .clickable { showPhotoSourceDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (photoUri != null) {
+                        if (displayPhoto != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
-                                    .data(photoUri)
+                                    .data(displayPhoto)
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = "Foto del animal",
@@ -368,7 +371,80 @@ fun AdoptionAnimalFormScreen(
                         TextButton(onClick = { photoUri = null }) {
                             Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Quitar foto", fontSize = 12.sp)
+                            Text("Quitar foto nueva", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // ── Additional Photos Section ────────────────────────────────
+            AnimatedVisibility(visible, enter = fadeIn(tween(300, 80)) + slideInVertically(tween(300, 80)) { 30 }) {
+                Text("Fotos Adicionales", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            AnimatedVisibility(visible, enter = fadeIn(tween(300, 120)) + slideInVertically(tween(300, 120)) { 30 }) {
+                Card(shape = RoundedCornerShape(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // Existing photos from API (edit mode)
+                        if (additionalPhotos.isNotEmpty()) {
+                            Text("Fotos actuales", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(additionalPhotos) { photoName ->
+                                    val photoUrl = com.example.petradar.utils.PetImageUrlResolver
+                                        .adoptionAdditionalPhotoUrl(viewModel.currentAnimalId, photoName)
+                                    Box(modifier = Modifier.size(80.dp)) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context).data(photoUrl).crossfade(true).build(),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.deleteAdditionalPhoto(viewModel.currentAnimalId, photoName)
+                                            },
+                                            modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Pending photos (selected but not yet uploaded)
+                        if (pendingAdditionalPhotos.isNotEmpty()) {
+                            Text("Nuevas fotos (${pendingAdditionalPhotos.size})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                itemsIndexed(pendingAdditionalPhotos) { index, uri ->
+                                    Box(modifier = Modifier.size(80.dp)) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context).data(uri).crossfade(true).build(),
+                                            contentDescription = null,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp))
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                pendingAdditionalPhotos = pendingAdditionalPhotos.toMutableList().also { it.removeAt(index) }
+                                            },
+                                            modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        val totalPhotos = additionalPhotos.size + pendingAdditionalPhotos.size
+                        OutlinedButton(
+                            onClick = { additionalGalleryLauncher.launch("image/*") },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading && totalPhotos < 5
+                        ) {
+                            Icon(Icons.Default.AddAPhoto, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (totalPhotos >= 5) "Límite de 5 fotos alcanzado" else "Agregar fotos")
                         }
                     }
                 }
@@ -398,7 +474,7 @@ fun AdoptionAnimalFormScreen(
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(speciesExpanded) },
                                 isError = speciesError != null,
                                 supportingText = speciesError?.let { err -> { Text(err) } },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                 enabled = !isLoading
                             )
                             ExposedDropdownMenu(expanded = speciesExpanded, onDismissRequest = { speciesExpanded = false }) {
@@ -415,7 +491,7 @@ fun AdoptionAnimalFormScreen(
                         ExposedDropdownMenuBox(expanded = sexExpanded, onExpandedChange = { sexExpanded = it }) {
                             OutlinedTextField(value = sexLabel, onValueChange = {}, readOnly = true, label = { Text("Sexo") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sexExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sexExpanded, onDismissRequest = { sexExpanded = false }) {
                                 sexOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sexLabel = label; sexValue = value; sexExpanded = false })
@@ -425,7 +501,7 @@ fun AdoptionAnimalFormScreen(
                         ExposedDropdownMenuBox(expanded = sizeExpanded, onExpandedChange = { sizeExpanded = it }) {
                             OutlinedTextField(value = sizeLabel, onValueChange = {}, readOnly = true, label = { Text("Tamaño") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(sizeExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), enabled = !isLoading)
                             ExposedDropdownMenu(expanded = sizeExpanded, onDismissRequest = { sizeExpanded = false }) {
                                 sizeOptions.forEach { (label, value) ->
                                     DropdownMenuItem(text = { Text(label) }, onClick = { sizeLabel = label; sizeValue = value; sizeExpanded = false })
@@ -471,7 +547,7 @@ fun AdoptionAnimalFormScreen(
                                     readOnly = true,
                                     label = { Text("Unidad") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ageUnitExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                     enabled = !isLoading
                                 )
                                 ExposedDropdownMenu(expanded = ageUnitExpanded, onDismissRequest = { ageUnitExpanded = false }) {
@@ -560,7 +636,7 @@ fun AdoptionAnimalFormScreen(
                                     value = statusLabel, onValueChange = {}, readOnly = true,
                                     label = { Text("Estado") },
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(statusExpanded) },
-                                    modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                    modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                                     enabled = !isLoading
                                 )
                                 ExposedDropdownMenu(expanded = statusExpanded, onDismissRequest = { statusExpanded = false }) {
@@ -626,7 +702,9 @@ fun AdoptionAnimalFormScreen(
                             status = if (isEditMode) statusValue.ifEmpty { null } else null,
                             adoptionDate = if (isEditMode) adoptionDate.trim().ifEmpty { null } else null,
                             adopterId = if (isEditMode) adopterId.trim().toLongOrNull() else null,
-                            photoUri = photoUri?.toString()
+                            photoUri = photoUri?.toString(),
+                            additionalPhotoUris = pendingAdditionalPhotos,
+                            context = context
                         )
                     },
                     modifier = Modifier.fillMaxWidth().height(52.dp),

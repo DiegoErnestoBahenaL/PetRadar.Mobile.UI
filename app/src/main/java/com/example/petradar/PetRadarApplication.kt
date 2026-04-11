@@ -5,10 +5,7 @@ import coil.Coil
 import coil.ImageLoader
 import coil.request.CachePolicy
 import com.example.petradar.api.RetrofitClient
-import com.example.petradar.utils.AuthManager
 import com.example.petradar.utils.NotificationHelper
-import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
 
 class PetRadarApplication : Application() {
 
@@ -20,35 +17,19 @@ class PetRadarApplication : Application() {
     }
 
     /**
-     * Configures a global Coil [ImageLoader] that injects the Bearer token into
-     * every image request at request-time (lazy read), so the token is always
-     * current even if it was refreshed after app start.
+     * Configures a global Coil [ImageLoader] that shares the same [OkHttpClient]
+     * used by Retrofit. This ensures:
+     *  - Every image request includes the `Authorization: Bearer <token>` header.
+     *  - Expired tokens are automatically refreshed via the Authenticator (same
+     *    token-refresh logic as API calls), so images never stop loading after
+     *    a token expiry.
      */
     private fun setupCoil() {
-        val context = this
-        val coilHttpClient = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor { chain ->
-                // Read token at request time — same pattern as RetrofitClient.
-                val token = AuthManager.getAuthToken(context)
-                val request = if (!token.isNullOrEmpty()) {
-                    chain.request().newBuilder()
-                        .addHeader("Authorization", "Bearer $token")
-                        .build()
-                } else {
-                    chain.request()
-                }
-                chain.proceed(request)
-            }
-            .build()
-
         Coil.setImageLoader(
-            ImageLoader.Builder(context)
-                .okHttpClient(coilHttpClient)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .memoryCachePolicy(CachePolicy.ENABLED)
+            ImageLoader.Builder(this)
+                .okHttpClient(RetrofitClient.imageHttpClient)
+                .diskCachePolicy(CachePolicy.DISABLED)
+                .memoryCachePolicy(CachePolicy.DISABLED)
                 .crossfade(true)
                 .build()
         )

@@ -62,6 +62,10 @@ object AuthManager {
     fun getAuthToken(context: Context): String? =
         getPrefs(context).getString(KEY_AUTH_TOKEN, null)
 
+    /** Returns the currently saved refresh token. */
+    fun getRefreshToken(context: Context): String? =
+        getPrefs(context).getString(KEY_REFRESH_TOKEN, null)
+
     /**
      * Saves basic user information after identifying the user via the API.
      * Called after login to associate the token with the user's profile.
@@ -130,8 +134,10 @@ object AuthManager {
      *
      * @return true if a valid token is saved; false otherwise.
      */
-    fun isAuthenticated(context: Context): Boolean =
-        !getAuthToken(context).isNullOrEmpty()
+    fun isAuthenticated(context: Context): Boolean {
+        val token = getAuthToken(context)
+        return !token.isNullOrEmpty() && !JwtUtils.isTokenExpired(token)
+    }
 
     /**
      * Updates the user's name and email stored in SharedPreferences.

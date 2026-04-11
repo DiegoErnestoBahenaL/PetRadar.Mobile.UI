@@ -2,5 +2,7 @@
 <paths>
     <!-- Directory used to store photos taken with the camera -->
     <cache-path name="camera_photos" path="camera_photos/" />
+    <!-- Directory used by Home quick-report camera capture -->
+    <cache-path name="quick_reports" path="quick_reports/" />
 </paths>
 

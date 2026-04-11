@@ -1,5 +1,6 @@
 ﻿package com.example.petradar.viewmodel
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -13,7 +14,9 @@ import com.example.petradar.utils.PetPhotoStore
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 class PetDetailViewModel : ViewModel() {
     private val repository = PetRepository()
     private val _pet = MutableLiveData<UserPetViewModel?>()
@@ -33,9 +36,76 @@ class PetDetailViewModel : ViewModel() {
      */
     private val _createdPetId = MutableLiveData<Long?>()
     val createdPetId: LiveData<Long?> = _createdPetId
+
+    private val _additionalPhotos = MutableLiveData<List<String>>(emptyList())
+    val additionalPhotos: LiveData<List<String>> = _additionalPhotos
+
     var pendingPhotoUri: String? = null
     var currentPetId: Long = -1L
     var currentUserId: Long = -1L
+
+    fun loadAdditionalPhotos(petId: Long) {
+        viewModelScope.launch {
+            try {
+                val response = repository.getAdditionalPhotos(petId)
+                if (response.isSuccessful) {
+                    _additionalPhotos.value = response.body() ?: emptyList()
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun uploadAdditionalPhotos(petId: Long, uris: List<Uri>, context: Context) {
+        viewModelScope.launch {
+            uploadAdditionalPhotosInternal(petId, uris, context)
+            loadAdditionalPhotos(petId)
+        }
+    }
+
+    fun deleteAdditionalPhoto(petId: Long, photoName: String) {
+        viewModelScope.launch {
+            try {
+                val response = repository.deleteAdditionalPhoto(petId, photoName)
+                if (response.isSuccessful) {
+                    _additionalPhotos.value = _additionalPhotos.value.orEmpty().filter { it != photoName }
+                } else {
+                    _errorMessage.value = "No se pudo eliminar la foto (${response.code()})"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error de conexión: ${e.message}"
+            }
+        }
+    }
+
+    private suspend fun uploadAdditionalPhotosInternal(petId: Long, uris: List<Uri>, context: Context) {
+        if (uris.isEmpty()) return
+        val parts = uris.mapNotNull { uri -> buildFilePart(uri, context) }
+        if (parts.isEmpty()) return
+        try {
+            val response = repository.uploadAdditionalPhotos(petId, parts)
+            if (!response.isSuccessful) {
+                _errorMessage.value = "Error al subir fotos adicionales (${response.code()})"
+            }
+        } catch (e: Exception) {
+            _errorMessage.value = "Error de conexión: ${e.message}"
+        }
+    }
+
+    private suspend fun buildFilePart(uri: Uri, context: Context): MultipartBody.Part? = withContext(Dispatchers.IO) {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val extension = when {
+            mimeType.contains("png", ignoreCase = true) -> "png"
+            mimeType.contains("webp", ignoreCase = true) -> "webp"
+            else -> "jpg"
+        }
+        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+        MultipartBody.Part.createFormData(
+            name = "files",
+            filename = "pet_extra_${System.currentTimeMillis()}.$extension",
+            body = requestBody
+        )
+    }
 
     fun savePet(
         name: String, speciesValue: String, breed: String?, color: String?,
@@ -43,6 +113,7 @@ class PetDetailViewModel : ViewModel() {
         weight: Double?, description: String?, isNeutered: Boolean,
         allergies: String?, medicalNotes: String?,
         photoUri: String? = null,
+        additionalPhotoUris: List<Uri> = emptyList(),
         context: Context
     ) {
         pendingPhotoUri = photoUri
@@ -54,7 +125,7 @@ class PetDetailViewModel : ViewModel() {
                 isNeutered = isNeutered,
                 allergies = allergies,
                 medicalNotes = medicalNotes,
-                photoUri = photoUri, context = context
+                photoUri = photoUri, additionalPhotoUris = additionalPhotoUris, context = context
             )
         } else {
             createPet(
@@ -64,7 +135,7 @@ class PetDetailViewModel : ViewModel() {
                 isNeutered = isNeutered,
                 allergies = allergies,
                 medicalNotes = medicalNotes,
-                photoUri = photoUri, context = context
+                photoUri = photoUri, additionalPhotoUris = additionalPhotoUris, context = context
             )
         }
     }
@@ -94,6 +165,7 @@ class PetDetailViewModel : ViewModel() {
         weight: Double?, description: String?, isNeutered: Boolean?,
         allergies: String?, medicalNotes: String?,
         photoUri: String? = null,
+        additionalPhotoUris: List<Uri> = emptyList(),
         context: Context
     ) {
         viewModelScope.launch {
@@ -110,17 +182,22 @@ class PetDetailViewModel : ViewModel() {
                 val response = repository.createPet(request)
                 if (response.isSuccessful) {
                     val createdPetId = resolveCreatedPetId(userId, name)
-                    if (!photoUri.isNullOrBlank() && createdPetId != null) {
-                        try {
+                    if (createdPetId != null) {
+                        if (!photoUri.isNullOrBlank()) {
                             PetPhotoStore.save(context, createdPetId, photoUri)
                             uploadPetMainPicture(createdPetId, photoUri, context)
-                        } catch (e: Exception) {
-                            _errorMessage.value = "Pet created successfully, but photo upload failed: ${e.message}"
+                        }
+                        if (additionalPhotoUris.isNotEmpty()) {
+                            uploadAdditionalPhotosInternal(createdPetId, additionalPhotoUris, context)
                         }
                     }
                     _saveSuccess.value = true
                 } else {
-                    _errorMessage.value = "Error creating pet: ${response.code()}"
+                    _errorMessage.value = if (response.code() == 401) {
+                        "Sesion expirada. Inicia sesion nuevamente."
+                    } else {
+                        "Error creating pet: ${response.code()}"
+                    }
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Connection error: ${e.message}"
@@ -150,6 +227,7 @@ class PetDetailViewModel : ViewModel() {
         weight: Double?, description: String?, isNeutered: Boolean?,
         allergies: String?, medicalNotes: String?,
         photoUri: String? = null,
+        additionalPhotoUris: List<Uri> = emptyList(),
         context: Context
     ) {
         viewModelScope.launch {
@@ -173,10 +251,17 @@ class PetDetailViewModel : ViewModel() {
                             _errorMessage.value = "Pet updated, but photo upload failed: ${e.message}"
                         }
                     }
+                    if (additionalPhotoUris.isNotEmpty()) {
+                        uploadAdditionalPhotosInternal(petId, additionalPhotoUris, context)
+                    }
                     _saveSuccess.value = true
                     loadPet(petId)
                 } else {
-                    _errorMessage.value = "Error updating pet: ${response.code()}"
+                    _errorMessage.value = if (response.code() == 401) {
+                        "Sesion expirada. Inicia sesion nuevamente."
+                    } else {
+                        "Error updating pet: ${response.code()}"
+                    }
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Connection error: ${e.message}"
@@ -210,20 +295,21 @@ class PetDetailViewModel : ViewModel() {
     private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context) {
         val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
 
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
-        val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-        val extension = when {
-            mimeType.contains("png", ignoreCase = true) -> "png"
-            mimeType.contains("webp", ignoreCase = true) -> "webp"
-            else -> "jpg"
-        }
-
-        val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
-        val filePart = MultipartBody.Part.createFormData(
-            name = "file",
-            filename = "pet_main.$extension",
-            body = requestBody
-        )
+        val filePart = withContext(Dispatchers.IO) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val extension = when {
+                mimeType.contains("png", ignoreCase = true) -> "png"
+                mimeType.contains("webp", ignoreCase = true) -> "webp"
+                else -> "jpg"
+            }
+            val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
+            MultipartBody.Part.createFormData(
+                name = "file",
+                filename = "pet_main.$extension",
+                body = requestBody
+            )
+        } ?: return
 
         val response = repository.uploadPetMainPicture(petId, filePart)
         if (!response.isSuccessful) {

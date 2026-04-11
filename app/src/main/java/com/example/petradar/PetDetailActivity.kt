@@ -54,8 +54,11 @@ class PetDetailActivity : ComponentActivity() {
         viewModel.currentPetId = petId
         viewModel.currentUserId = userId
 
-        // Only in edit mode do we load the existing pet data.
-        if (petId > 0) viewModel.loadPet(petId)
+        // Only in edit mode do we load the existing pet data and additional photos.
+        if (petId > 0) {
+            viewModel.loadPet(petId)
+            viewModel.loadAdditionalPhotos(petId)
+        }
 
         // Observe saveSuccess so we can schedule alarms once we know the pet ID.
         // For new pets the petId is unknown until after the server responds;

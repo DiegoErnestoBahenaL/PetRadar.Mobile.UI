@@ -57,6 +57,25 @@ object JwtUtils {
         Log.w(TAG, "No userId claim found. Available keys: ${json.keys().asSequence().toList()}")
         return null
     }
+
+    /**
+     * Reads JWT expiration (`exp`) as epoch seconds.
+     */
+    fun getExpirationEpochSeconds(token: String?): Long? {
+        val json = decodePayload(token) ?: return null
+        if (!json.has("exp")) return null
+        return runCatching { json.getLong("exp") }.getOrNull()
+    }
+
+    /**
+     * Returns true when token is expired (or about to expire within [leewaySeconds]).
+     */
+    fun isTokenExpired(token: String?, leewaySeconds: Long = 30L): Boolean {
+        if (token.isNullOrBlank()) return true
+        val exp = getExpirationEpochSeconds(token) ?: return false
+        val now = System.currentTimeMillis() / 1000
+        return now >= (exp - leewaySeconds)
+    }
 }
 
 
