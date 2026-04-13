@@ -3,6 +3,7 @@ package com.example.petradar.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -244,6 +245,42 @@ fun PetDetailContent(
     var showPhotoRequiredDialog by remember { mutableStateOf(false) }
     var photoPromptDismissed by remember { mutableStateOf(false) }
 
+    // ── Discard-changes guard ────────────────────────────────────────────
+    var origName        by remember { mutableStateOf("") }
+    var origSpecies     by remember { mutableStateOf("") }
+    var origSex         by remember { mutableStateOf("") }
+    var origSize        by remember { mutableStateOf("") }
+    var origBreed       by remember { mutableStateOf("") }
+    var origColor       by remember { mutableStateOf("") }
+    var origBirthDate   by remember { mutableStateOf("") }
+    var origWeight      by remember { mutableStateOf("") }
+    var origDescription by remember { mutableStateOf("") }
+    var origNeutered    by remember { mutableStateOf(false) }
+    var origAllergies   by remember { mutableStateOf("") }
+    var origMedNotes    by remember { mutableStateOf("") }
+    var formInitialized by remember { mutableStateOf(!isEditMode) }
+
+    val hasChanges = formInitialized && (
+        petName        != origName        ||
+        speciesValue   != origSpecies     ||
+        sexValue       != origSex         ||
+        sizeValue      != origSize        ||
+        petBreed       != origBreed       ||
+        petColor       != origColor       ||
+        birthDate      != origBirthDate   ||
+        petWeight      != origWeight      ||
+        petDescription != origDescription ||
+        isNeutered     != origNeutered    ||
+        petAllergies   != origAllergies   ||
+        medicalNotes   != origMedNotes    ||
+        photoUri       != null            ||
+        pendingAdditionalPhotos.isNotEmpty()
+    )
+
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = hasChanges) { showDiscardDialog = true }
+
     var speciesExpanded by remember { mutableStateOf(false) }
     var sexExpanded by remember { mutableStateOf(false) }
     var sizeExpanded by remember { mutableStateOf(false) }
@@ -291,6 +328,21 @@ fun PetDetailContent(
         sizeLabel = foundSize?.first ?: p.size ?: ""
         sizeValue = foundSize?.second ?: p.size ?: ""
 
+        if (!formInitialized) {
+            origName        = petName
+            origSpecies     = speciesValue
+            origSex         = sexValue
+            origSize        = sizeValue
+            origBreed       = petBreed
+            origColor       = petColor
+            origBirthDate   = birthDate
+            origWeight      = petWeight
+            origDescription = petDescription
+            origNeutered    = isNeutered
+            origAllergies   = petAllergies
+            origMedNotes    = medicalNotes
+            formInitialized = true
+        }
     }
 
     LaunchedEffect(errorMessage) {
@@ -303,6 +355,24 @@ fun PetDetailContent(
             photoUri = null
         }
         if (saveSuccess) onBack()
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("¿Descartar cambios?") },
+            text = { Text("Tienes cambios sin guardar. ¿Deseas descartarlos?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showDiscardDialog = false; onBack() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Descartar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) { Text("Seguir editando") }
+            }
+        )
     }
 
     if (showPhotoSourceDialog) {
@@ -399,7 +469,7 @@ fun PetDetailContent(
                     Text(if (isEditMode) "Editar Mascota" else "Nueva Mascota", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (hasChanges) showDiscardDialog = true else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },

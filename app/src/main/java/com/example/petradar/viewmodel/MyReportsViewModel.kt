@@ -21,6 +21,9 @@ class MyReportsViewModel : ViewModel() {
     private val _errorMessage = MutableLiveData<String?>()
     val errorMessage: LiveData<String?> = _errorMessage
 
+    private val _deleteSuccess = MutableLiveData<Long?>()
+    val deleteSuccess: LiveData<Long?> = _deleteSuccess
+
     fun loadReports(userId: Long) {
         if (userId <= 0) {
             _errorMessage.value = "Usuario no identificado"
@@ -43,6 +46,26 @@ class MyReportsViewModel : ViewModel() {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun deleteReport(reportId: Long) {
+        viewModelScope.launch {
+            try {
+                val response = repository.delete(reportId)
+                if (response.isSuccessful) {
+                    _reports.value = _reports.value.orEmpty().filter { it.id != reportId }
+                    _deleteSuccess.value = reportId
+                } else {
+                    _errorMessage.value = "No se pudo eliminar el reporte (${response.code()})"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error de conexión: ${e.message}"
+            }
+        }
+    }
+
+    fun clearDeleteSuccess() {
+        _deleteSuccess.value = null
     }
 }
 

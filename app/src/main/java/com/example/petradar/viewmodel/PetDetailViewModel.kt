@@ -293,10 +293,16 @@ class PetDetailViewModel : ViewModel() {
     }
 
     private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context) {
-        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
+        val uri = runCatching { uriString.toUri() }.getOrNull() ?: run {
+            _errorMessage.value = "No se pudo leer la imagen seleccionada."
+            return
+        }
 
         val filePart = withContext(Dispatchers.IO) {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: run {
+                _errorMessage.value = "No se pudo leer la imagen seleccionada."
+                return@withContext null
+            }
             val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
             val extension = when {
                 mimeType.contains("png", ignoreCase = true) -> "png"
@@ -313,7 +319,7 @@ class PetDetailViewModel : ViewModel() {
 
         val response = repository.uploadPetMainPicture(petId, filePart)
         if (!response.isSuccessful) {
-            _errorMessage.value = "Error uploading photo (${response.code()})"
+            _errorMessage.value = "Error al subir la foto (${response.code()}). Inténtalo de nuevo."
         }
     }
 }

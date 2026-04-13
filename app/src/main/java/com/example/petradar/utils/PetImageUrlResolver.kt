@@ -49,6 +49,12 @@ object PetImageUrlResolver {
         return "$base/api/AdoptionAnimals/$animalId/additionalphotos/$photoName"
     }
 
+    /** Deterministic endpoint that always points to the latest report main picture. */
+    fun reportMainPictureEndpoint(reportId: Long): String {
+        val base = RetrofitClient.BASE_URL.trimEnd('/')
+        return "$base/api/Reports/$reportId/mainpicture"
+    }
+
     /** URL for a specific additional photo of a Report. */
     fun reportAdditionalPhotoUrl(reportId: Long, photoName: String): String {
         val base = RetrofitClient.BASE_URL.trimEnd('/')

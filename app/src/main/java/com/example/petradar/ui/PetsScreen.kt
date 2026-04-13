@@ -223,6 +223,7 @@ private fun PetCard(
     val photoUriStr = PetImageUrlResolver.mainPictureEndpoint(pet.id)
 
     Card(
+        onClick = onEdit,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
@@ -255,9 +256,6 @@ private fun PetCard(
                 Text(text = sexLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             }
             Column {
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
-                }
                 IconButton(onClick = onReportLost) {
                     Icon(Icons.Default.Report, contentDescription = "Reportar perdida", tint = MaterialTheme.colorScheme.error)
                 }

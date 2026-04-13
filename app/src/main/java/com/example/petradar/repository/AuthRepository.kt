@@ -3,6 +3,7 @@ package com.example.petradar.repository
 import com.example.petradar.api.RetrofitClient
 import com.example.petradar.api.models.LoginRequest
 import com.example.petradar.api.models.LoginResponse
+import com.example.petradar.api.models.RefreshTokenRequest
 import com.example.petradar.api.models.RegisterRequest
 import retrofit2.Response
 
@@ -34,6 +35,21 @@ class AuthRepository {
     suspend fun login(username: String, password: String): Response<LoginResponse> {
         val request = LoginRequest(username, password)
         return apiService.login(request)
+    }
+
+    /**
+     * Renews the JWT using the saved refresh token.
+     * Endpoint: POST /api/gate/Login/refresh
+     *
+     * Call this when [com.example.petradar.utils.AuthManager.isAuthenticated] returns false
+     * but a refresh token is still available, to avoid forcing the user to re-enter credentials.
+     *
+     * @param token The refresh token previously stored in [com.example.petradar.utils.AuthManager].
+     * @return [Response] with a new [LoginResponse] (new JWT + new refresh token) on success,
+     *         or a 4xx/5xx code if the refresh token is invalid or expired.
+     */
+    suspend fun refreshToken(token: String): Response<LoginResponse> {
+        return apiService.refreshToken(RefreshTokenRequest(token))
     }
 
     /**

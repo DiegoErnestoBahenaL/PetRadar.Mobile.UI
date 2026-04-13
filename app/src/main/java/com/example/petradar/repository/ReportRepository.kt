@@ -1,6 +1,7 @@
 package com.example.petradar.repository
 
 import com.example.petradar.api.ReportCreateModel
+import com.example.petradar.api.ReportUpdateModel
 import com.example.petradar.api.ReportViewModel
 import com.example.petradar.api.RetrofitClient
 import okhttp3.MultipartBody
@@ -31,5 +32,14 @@ class ReportRepository {
 
     suspend fun deleteAdditionalPhoto(reportId: Long, photoName: String): Response<Unit> =
         api.deleteReportAdditionalPhoto(reportId, photoName)
+
+    /** GET /api/Reports/{id} */
+    suspend fun getById(id: Long): Response<ReportViewModel> = api.getReportById(id)
+
+    /** PUT /api/Reports/{id} */
+    suspend fun update(id: Long, request: ReportUpdateModel): Response<Unit> = api.updateReport(id, request)
+
+    /** DELETE /api/Reports/{id} */
+    suspend fun delete(id: Long): Response<Unit> = api.deleteReport(id)
 }
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
@@ -75,7 +76,8 @@ import java.io.File
 fun AdoptionAnimalFormScreen(
     viewModel: AdoptionAnimalDetailViewModel,
     isEditMode: Boolean,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSaved: () -> Unit = onBack
 ) {
     val context = LocalContext.current
     val animalData by viewModel.animal.observeAsState()
@@ -184,6 +186,59 @@ fun AdoptionAnimalFormScreen(
     var nameError by remember { mutableStateOf<String?>(null) }
     var speciesError by remember { mutableStateOf<String?>(null) }
 
+    // ── Discard-changes guard ────────────────────────────────────────────
+    // origXxx = snapshot of values loaded from the API (edit mode) or empty (create mode).
+    // formInitialized turns true once the snapshot is captured so hasChanges is stable.
+    var origName        by remember { mutableStateOf("") }
+    var origSpecies     by remember { mutableStateOf("") }
+    var origSex         by remember { mutableStateOf("") }
+    var origSize        by remember { mutableStateOf("") }
+    var origBreed       by remember { mutableStateOf("") }
+    var origColor       by remember { mutableStateOf("") }
+    var origAgeValue    by remember { mutableStateOf("") }
+    var origAgeUnit     by remember { mutableStateOf("years") }
+    var origWeight      by remember { mutableStateOf("") }
+    var origDescription by remember { mutableStateOf("") }
+    var origPersonality by remember { mutableStateOf("") }
+    var origNeutered    by remember { mutableStateOf(false) }
+    var origVaccinated  by remember { mutableStateOf(false) }
+    var origGoodKids    by remember { mutableStateOf(false) }
+    var origGoodDogs    by remember { mutableStateOf(false) }
+    var origGoodCats    by remember { mutableStateOf(false) }
+    var origSpecialCare by remember { mutableStateOf(false) }
+    var origSpecialDetails by remember { mutableStateOf("") }
+    var origStatus      by remember { mutableStateOf("") }
+    var formInitialized by remember { mutableStateOf(!isEditMode) }
+
+    // Computed directly during composition so Compose always reads the latest state.
+    val hasChanges = formInitialized && (
+        animalName         != origName           ||
+        speciesValue       != origSpecies        ||
+        sexValue           != origSex            ||
+        sizeValue          != origSize           ||
+        animalBreed        != origBreed          ||
+        animalColor        != origColor          ||
+        ageValue           != origAgeValue       ||
+        ageUnitValue       != origAgeUnit        ||
+        animalWeight       != origWeight         ||
+        animalDescription  != origDescription    ||
+        personality        != origPersonality    ||
+        isNeutered         != origNeutered       ||
+        isVaccinated       != origVaccinated     ||
+        goodWithKids       != origGoodKids       ||
+        goodWithDogs       != origGoodDogs       ||
+        goodWithCats       != origGoodCats       ||
+        needsSpecialCare   != origSpecialCare    ||
+        specialCareDetails != origSpecialDetails ||
+        statusValue        != origStatus         ||
+        photoUri           != null               ||
+        pendingAdditionalPhotos.isNotEmpty()
+    )
+
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = hasChanges) { showDiscardDialog = true }
+
     var speciesExpanded by remember { mutableStateOf(false) }
     var sexExpanded by remember { mutableStateOf(false) }
     var sizeExpanded by remember { mutableStateOf(false) }
@@ -251,6 +306,30 @@ fun AdoptionAnimalFormScreen(
         statusLabel = foundStatus?.first ?: a.status ?: ""
         statusValue = foundStatus?.second ?: a.status ?: ""
 
+        // Capture the original snapshot only on the first load.
+        if (!formInitialized) {
+            origName        = animalName
+            origSpecies     = speciesValue
+            origSex         = sexValue
+            origSize        = sizeValue
+            origBreed       = animalBreed
+            origColor       = animalColor
+            origAgeValue    = ageValue
+            origAgeUnit     = ageUnitValue
+            origWeight      = animalWeight
+            origDescription = animalDescription
+            origPersonality = personality
+            origNeutered    = isNeutered
+            origVaccinated  = isVaccinated
+            origGoodKids    = goodWithKids
+            origGoodDogs    = goodWithDogs
+            origGoodCats    = goodWithCats
+            origSpecialCare = needsSpecialCare
+            origSpecialDetails = specialCareDetails
+            origStatus      = statusValue
+            formInitialized = true
+        }
+
         // photoUri stays null; the deterministic API URL is shown as fallback in the UI
     }
 
@@ -260,7 +339,26 @@ fun AdoptionAnimalFormScreen(
     }
 
     LaunchedEffect(saveSuccess) {
-        if (saveSuccess) onBack()
+        if (saveSuccess) onSaved()
+    }
+
+    // Discard-changes confirmation dialog
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            icon = { Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("¿Descartar cambios?") },
+            text = { Text("Tienes cambios sin guardar. ¿Deseas descartarlos?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showDiscardDialog = false; onBack() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Descartar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) { Text("Seguir editando") }
+            }
+        )
     }
 
     // Photo source dialog (Gallery vs Camera)
@@ -300,7 +398,7 @@ fun AdoptionAnimalFormScreen(
                     Text(if (isEditMode) "Editar Animal" else "Publicar nuevo animal", fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (hasChanges) showDiscardDialog = true else onBack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 },

@@ -5,16 +5,22 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import com.example.petradar.repository.AuthRepository
 import com.example.petradar.ui.LoginScreen
 import com.example.petradar.ui.theme.PetRadarTheme
 import com.example.petradar.utils.AuthManager
 import com.example.petradar.viewmodel.LoginViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * LoginActivity is the sign-in screen of PetRadar.
@@ -74,12 +80,107 @@ class LoginActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Decides which screen to show on launch:
+     *
+     * 1. JWT still valid          → HomeActivity (instant, no network call)
+     * 2. JWT expired + refresh ok → renew silently → HomeActivity
+     * 3. Both tokens expired      → re-login with saved credentials → HomeActivity
+     * 4. No credentials at all    → LoginScreen (first launch / after explicit logout)
+     */
     private fun continueAppFlow() {
         if (AuthManager.isAuthenticated(this)) {
             navigateToHome()
             return
         }
 
+        lifecycleScope.launch {
+            // Step 2: try refresh token
+            val savedRefreshToken = AuthManager.getRefreshToken(this@LoginActivity)
+            if (!savedRefreshToken.isNullOrEmpty()) {
+                if (tryRefreshToken(savedRefreshToken)) {
+                    navigateToHome()
+                    return@launch
+                }
+            }
+
+            // Step 3: try silent re-login with encrypted saved credentials
+            val email    = AuthManager.getSavedEmail(this@LoginActivity)
+            val password = AuthManager.getSavedPassword(this@LoginActivity)
+            if (!email.isNullOrEmpty() && !password.isNullOrEmpty()) {
+                if (trySilentLogin(email, password)) {
+                    navigateToHome()
+                    return@launch
+                }
+            }
+
+            // Step 4: nothing worked — show login screen
+            showLoginScreen()
+        }
+    }
+
+    /**
+     * Attempts to obtain a new JWT by calling POST /api/gate/Login/refresh.
+     * On success the new tokens are persisted in [AuthManager].
+     *
+     * @return true if a valid new token was received and saved; false otherwise.
+     */
+    private suspend fun tryRefreshToken(refreshToken: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = AuthRepository().refreshToken(refreshToken)
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (!body?.token.isNullOrEmpty()) {
+                        AuthManager.saveAuthToken(
+                            this@LoginActivity,
+                            body!!.token,
+                            body.refreshToken
+                        )
+                        Log.d("LoginActivity", "Token refreshed successfully")
+                        return@withContext true
+                    }
+                }
+                Log.w("LoginActivity", "Refresh failed: ${response.code()}")
+                false
+            } catch (e: Exception) {
+                Log.e("LoginActivity", "Refresh token error", e)
+                false
+            }
+        }
+
+    /**
+     * Attempts a full login using the encrypted credentials saved in [AuthManager].
+     * Called only when both the JWT and refresh token have expired.
+     * On success, new tokens are saved automatically.
+     *
+     * @return true if login succeeded; false on wrong credentials or network error.
+     */
+    private suspend fun trySilentLogin(email: String, password: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = AuthRepository().login(email, password)
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (!body?.token.isNullOrEmpty()) {
+                        AuthManager.saveAuthToken(
+                            this@LoginActivity,
+                            body!!.token,
+                            body.refreshToken
+                        )
+                        Log.d("LoginActivity", "Silent re-login successful")
+                        return@withContext true
+                    }
+                }
+                Log.w("LoginActivity", "Silent re-login failed: ${response.code()}")
+                false
+            } catch (e: Exception) {
+                Log.e("LoginActivity", "Silent re-login error", e)
+                false
+            }
+        }
+
+    private fun showLoginScreen() {
         val viewModel = ViewModelProvider(this)[LoginViewModel::class.java]
 
         viewModel.loginSuccess.observe(this) { success ->
