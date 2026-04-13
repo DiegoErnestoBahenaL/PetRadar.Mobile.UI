@@ -1,5 +1,6 @@
 package com.example.petradar
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -37,6 +38,7 @@ class LostPetReportActivity : ComponentActivity() {
                     viewModel = viewModel,
                     initialPhotoUri = initialPhotoUri,
                     onBack = { finish() },
+                    onSaved = { setResult(Activity.RESULT_OK); finish() },
                     onSubmit = { form, pet, photoUri ->
                         if (userId <= 0) return@LostPetReportScreen
 

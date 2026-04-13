@@ -122,6 +122,10 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
                         loginResponse.refreshToken
                     )
 
+                    // Persist credentials encrypted so silent re-authentication is possible
+                    // even if both the JWT and the refresh token expire later.
+                    AuthManager.saveCredentials(getApplication(), username, password)
+
                     // Fetch the user profile to obtain the userId and check emailVerified.
                     // loginSuccess / emailNotVerified are emitted inside this call.
                     fetchUserIdByEmail(username)

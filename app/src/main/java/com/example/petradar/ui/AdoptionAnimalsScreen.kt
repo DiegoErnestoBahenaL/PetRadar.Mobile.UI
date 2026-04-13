@@ -250,7 +250,7 @@ private fun AdoptionAnimalGridCard(
     val photoUrl = PetImageUrlResolver.adoptionMainPictureEndpoint(animal.id)
 
     Card(
-        onClick = onClick,
+        onClick = if (isOwner) onEdit else onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
@@ -335,7 +335,7 @@ private fun AdoptionAnimalGridCard(
 
             // Action buttons
             if (isOwner) {
-                // Owner: edit + delete (icon-only)
+                // Owner: delete only (card tap = edit)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -343,14 +343,6 @@ private fun AdoptionAnimalGridCard(
                         .padding(bottom = 4.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    IconButton(onClick = onEdit) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Editar",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
                     IconButton(onClick = onDelete) {
                         Icon(
                             Icons.Default.Delete,

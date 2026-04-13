@@ -1,10 +1,12 @@
 package com.example.petradar
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -20,14 +22,27 @@ class AdoptionAnimalDetailActivity : ComponentActivity() {
         const val EXTRA_ANIMAL_ID = "extra_animal_id"
     }
 
+    private var animalId = -1L
+    private lateinit var detailViewModel: AdoptionAnimalDetailViewModel
+
+    // Reload detail only when the form reports a successful save (RESULT_OK).
+    private val editLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && animalId > 0) {
+            detailViewModel.loadAnimal(animalId)
+            detailViewModel.loadAdditionalPhotos(animalId)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        val animalId = intent.getLongExtra(EXTRA_ANIMAL_ID, -1L)
+        animalId = intent.getLongExtra(EXTRA_ANIMAL_ID, -1L)
         val currentUserId = AuthManager.getUserId(this) ?: -1L
 
-        val detailViewModel = ViewModelProvider(this)[AdoptionAnimalDetailViewModel::class.java]
+        detailViewModel = ViewModelProvider(this)[AdoptionAnimalDetailViewModel::class.java]
         detailViewModel.currentAnimalId = animalId
         if (animalId > 0) {
             detailViewModel.loadAnimal(animalId)
@@ -51,7 +66,7 @@ class AdoptionAnimalDetailActivity : ComponentActivity() {
                     onEditAnimal = {
                         val intent = Intent(this, AdoptionAnimalFormActivity::class.java)
                         intent.putExtra(AdoptionAnimalFormActivity.EXTRA_ANIMAL_ID, animalId)
-                        startActivity(intent)
+                        editLauncher.launch(intent)
                     },
                     onDeleteAnimal = {
                         listViewModel.deleteAnimal(animalId)

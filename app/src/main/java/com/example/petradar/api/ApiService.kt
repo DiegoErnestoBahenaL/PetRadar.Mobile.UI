@@ -294,6 +294,39 @@ interface ApiService {
         @Path("photoName") photoName: String
     ): Response<Unit>
 
+    /**
+     * Retrieves the details of a report by its ID.
+     * Endpoint: GET /api/Reports/{id}
+     *
+     * @param id Report ID. HTTP 404 if not found.
+     */
+    @GET("api/Reports/{id}")
+    suspend fun getReportById(@Path("id") id: Long): Response<ReportViewModel>
+
+    /**
+     * Updates an existing report.
+     * Endpoint: PUT /api/Reports/{id}
+     *
+     * @param id      Report ID to update.
+     * @param request Fields to modify ([ReportUpdateModel]); null fields are omitted.
+     * @return HTTP 204 No Content on success.
+     */
+    @PUT("api/Reports/{id}")
+    suspend fun updateReport(
+        @Path("id") id: Long,
+        @Body request: ReportUpdateModel
+    ): Response<Unit>
+
+    /**
+     * Deletes a report by its ID.
+     * Endpoint: DELETE /api/Reports/{id}
+     *
+     * @param id Report ID to delete.
+     * @return HTTP 204 No Content on success.
+     */
+    @DELETE("api/Reports/{id}")
+    suspend fun deleteReport(@Path("id") id: Long): Response<Unit>
+
     // =========================================================================
     // Veterinary Appointments  →  /api/VeterinaryAppointments
     // =========================================================================
@@ -518,6 +551,8 @@ data class VeterinaryAppointmentViewModel(
     val prescriptions: String?,
     val cost: Double?,
     val addressText: String?,
+    val latitude: Double?,
+    val longitude: Double?,
     val reminderSent: Boolean
 )
 
@@ -538,7 +573,9 @@ data class VeterinaryAppointmentCreateModel(
     val treatment: String? = null,
     val prescriptions: String? = null,
     val cost: Double? = null,
-    val addressText: String? = null
+    val addressText: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 /**
@@ -557,7 +594,9 @@ data class VeterinaryAppointmentUpdateModel(
     val treatment: String? = null,
     val prescriptions: String? = null,
     val cost: Double? = null,
-    val addressText: String? = null
+    val addressText: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 // =============================================================================
@@ -677,12 +716,12 @@ data class ReportCreateModel(
     val latitude: Double,
     val longitude: Double,
     val addressText: String? = null,
-    val searchRadiusMeters: Int? = null,
-    val useAlternateContact: Boolean? = null,
+    val searchRadiusMeters: Int = 0,
+    val useAlternateContact: Boolean = false,
     val contactName: String? = null,
     val contactPhone: String? = null,
     val contactEmail: String? = null,
-    val offersReward: Boolean? = null,
+    val offersReward: Boolean = false,
     val rewardAmount: Double? = null
 )
 
@@ -719,6 +758,37 @@ data class ReportViewModel(
     val offersReward: Boolean?,
     val rewardAmount: Double?,
     val views: Int?
+)
+
+/**
+ * Payload for updating an existing report (ReportUpdateModel in Swagger).
+ * All fields are optional; only non-null values are considered for the update.
+ */
+data class ReportUpdateModel(
+    val species: String? = null,
+    val breed: String? = null,
+    val color: String? = null,
+    val sex: String? = null,
+    val size: String? = null,
+    val approximateAge: Double? = null,
+    val weight: Double? = null,
+    val description: String? = null,
+    val isNeutered: Boolean? = null,
+    val reportType: String? = null,
+    val reportStatus: String? = null,
+    val hasCollar: Boolean? = null,
+    val hasTag: Boolean? = null,
+    val incidentDate: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val addressText: String? = null,
+    val searchRadiusMeters: Int? = null,
+    val useAlternateContact: Boolean? = null,
+    val contactName: String? = null,
+    val contactPhone: String? = null,
+    val contactEmail: String? = null,
+    val offersReward: Boolean? = null,
+    val rewardAmount: Double? = null
 )
 
 // =============================================================================

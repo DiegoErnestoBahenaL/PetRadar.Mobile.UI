@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!--
+        mipmap-anydpi-v26 retains the -v26 qualifier intentionally.
+        Renaming it to mipmap-anydpi creates IconXmlAndPng conflicts with the
+        density-specific .webp bitmaps, which some custom ROMs still prefer.
+        Since minSdk is 26 this qualifier is technically redundant but harmless.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="res/mipmap-anydpi-v26" />
+    </issue>
+</lint>
