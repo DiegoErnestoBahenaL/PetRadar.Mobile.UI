@@ -80,8 +80,10 @@ class StrayReportViewModel : ViewModel() {
             val mimeType: String
             if (isRemote) {
                 val response = runCatching { RetrofitClient.apiService.downloadFile(uriString) }.getOrNull()
-                bytes = response?.takeIf { it.isSuccessful }?.body()?.bytes()
-                mimeType = "image/jpeg"
+                    ?.takeIf { it.isSuccessful } ?: return@withContext null
+                bytes = response.body()?.bytes()
+                mimeType = response.headers()["Content-Type"]
+                    ?.substringBefore(";")?.trim() ?: "image/jpeg"
             } else {
                 bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"

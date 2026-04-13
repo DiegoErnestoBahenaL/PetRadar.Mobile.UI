@@ -300,7 +300,7 @@ class PetDetailViewModel : ViewModel() {
 
         val filePart = withContext(Dispatchers.IO) {
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: run {
-                _errorMessage.value = "No se pudo leer la imagen seleccionada."
+                _errorMessage.postValue("No se pudo leer la imagen seleccionada.")
                 return@withContext null
             }
             val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
