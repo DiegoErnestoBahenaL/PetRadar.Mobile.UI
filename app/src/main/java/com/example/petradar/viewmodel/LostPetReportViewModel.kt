@@ -141,8 +141,21 @@ class LostPetReportViewModel : ViewModel() {
     private suspend fun uploadReportMainPicture(reportId: Long, uriString: String, context: Context) {
         val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
         val filePart = withContext(Dispatchers.IO) {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@withContext null
-            val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val scheme = uri.scheme?.lowercase() ?: ""
+            val isRemote = scheme == "http" || scheme == "https"
+            val bytes: ByteArray?
+            val mimeType: String
+            if (isRemote) {
+                val response = runCatching { RetrofitClient.apiService.downloadFile(uriString) }.getOrNull()
+                    ?.takeIf { it.isSuccessful } ?: return@withContext null
+                bytes = response.body()?.bytes()
+                mimeType = response.headers()["Content-Type"]
+                    ?.substringBefore(";")?.trim() ?: "image/jpeg"
+            } else {
+                bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+            }
+            if (bytes == null) return@withContext null
             val extension = when {
                 mimeType.contains("png", ignoreCase = true) -> "png"
                 mimeType.contains("webp", ignoreCase = true) -> "webp"

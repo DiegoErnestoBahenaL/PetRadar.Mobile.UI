@@ -84,6 +84,11 @@
             android:label="Reportar Perdida"
             android:parentActivityName=".PetDetailActivity" />
         <activity
+            android:name=".StrayReportActivity"
+            android:exported="false"
+            android:label="Reportar Animal en Calle"
+            android:parentActivityName=".HomeActivity" />
+        <activity
             android:name=".AppointmentsActivity"
             android:exported="false"
             android:label="Citas Veterinarias"
@@ -108,6 +113,16 @@
             android:exported="false"
             android:label="Detalle de Adopción"
             android:parentActivityName=".AdoptionAnimalsActivity" />
+        <activity
+            android:name=".ReportEditActivity"
+            android:exported="false"
+            android:label="Editar Reporte"
+            android:parentActivityName=".MyReportsActivity" />
+        <activity
+            android:name=".PetPickerActivity"
+            android:exported="false"
+            android:label="Seleccionar Mascota"
+            android:parentActivityName=".MyReportsActivity" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

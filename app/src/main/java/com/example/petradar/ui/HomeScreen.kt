@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +72,9 @@ fun HomeScreen(
     userName: String,
     userEmail: String,
     profilePhotoUrl: String? = null,
+    isRefreshing: Boolean = false,
+    imageRefreshKey: Long = 0L,
+    onRefresh: () -> Unit = {},
     onNavigateToProfile: () -> Unit,
     onNavigateToPets: () -> Unit,
     onNavigateToAppointments: () -> Unit,
@@ -144,6 +148,7 @@ fun HomeScreen(
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(profilePhotoUrl)
+                                        .memoryCacheKey("profile_drawer_$imageRefreshKey")
                                         .crossfade(true)
                                         .build(),
                                     contentDescription = "Foto de perfil",
@@ -279,7 +284,7 @@ fun HomeScreen(
             bottomBar = {
                 HomeBottomBar(
                     onAppointments = onNavigateToAppointments,
-                    onAdoptions = onNavigateToAdoptions,
+                    onPets = onNavigateToPets,
                     onCamera = ::launchQuickCamera,
                     onReports = onNavigateToReports,
                     onProfile = onNavigateToProfile
@@ -287,10 +292,16 @@ fun HomeScreen(
             },
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
-            Column(
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = onRefresh,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+            ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -323,6 +334,7 @@ fun HomeScreen(
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(profilePhotoUrl)
+                                            .memoryCacheKey("profile_card_$imageRefreshKey")
                                             .crossfade(true)
                                             .build(),
                                         contentDescription = "Foto de perfil",
@@ -372,9 +384,9 @@ fun HomeScreen(
                 ) {
                     QuickAccessCard(
                         icon = Icons.Default.Pets,
-                        title = "Mis Mascotas",
+                        title = "Adopciones",
                         color = PetTeal40,
-                        onClick = onNavigateToPets
+                        onClick = onNavigateToAdoptions
                     )
                 }
 
@@ -402,6 +414,7 @@ fun HomeScreen(
                     )
                 }
             }
+            } // PullToRefreshBox
         }
     }
 }
@@ -409,7 +422,7 @@ fun HomeScreen(
 @Composable
 private fun HomeBottomBar(
     onAppointments: () -> Unit,
-    onAdoptions: () -> Unit,
+    onPets: () -> Unit,
     onCamera: () -> Unit,
     onReports: () -> Unit,
     onProfile: () -> Unit
@@ -433,8 +446,8 @@ private fun HomeBottomBar(
                     )
                     BottomNavAction(
                         icon = Icons.Default.Pets,
-                        label = "Adopciones",
-                        onClick = onAdoptions,
+                        label = "Mis Mascotas",
+                        onClick = onPets,
                         modifier = Modifier.weight(1f)
                     )
                     // Espacio central para el botón de cámara flotante

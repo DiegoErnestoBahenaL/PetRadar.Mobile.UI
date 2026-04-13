@@ -56,8 +56,9 @@ class AdoptionAnimalFormActivity : ComponentActivity() {
             PetRadarTheme {
                 AdoptionAnimalFormScreen(
                     viewModel = viewModel,
-                    isEditMode = animalId > 0, // true = edit, false = create
-                    onBack = { finish() }
+                    isEditMode = animalId > 0,
+                    onBack = { finish() },
+                    onSaved = { setResult(RESULT_OK); finish() }
                 )
             }
         }

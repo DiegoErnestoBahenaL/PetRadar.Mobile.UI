@@ -20,6 +20,7 @@ lifecycle = "2.10.0"
 activityKtx = "1.13.0"
 coil = "2.7.0"
 osmdroid = "6.1.20"
+securityCrypto = "1.1.0-alpha06"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -61,6 +62,8 @@ androidx-compose-icons-extended = { group = "androidx.compose.material", name = 
 androidx-compose-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata" }
 # Coil — image loading for Compose
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+# Jetpack Security — EncryptedSharedPreferences for credential storage
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 # OpenStreetMap
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 

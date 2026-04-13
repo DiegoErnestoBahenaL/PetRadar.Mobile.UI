@@ -91,6 +91,9 @@ dependencies {
     // Coil — image loading for Compose
     implementation(libs.coil.compose)
 
+    // Jetpack Security — EncryptedSharedPreferences for credential storage
+    implementation(libs.androidx.security.crypto)
+
     // OpenStreetMap — free map picker for lost report location
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 

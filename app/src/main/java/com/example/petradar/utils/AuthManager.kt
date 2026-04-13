@@ -2,7 +2,10 @@ package com.example.petradar.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.core.content.edit
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 /**
  * Local session manager for PetRadar.
@@ -25,7 +28,8 @@ import androidx.core.content.edit
  */
 object AuthManager {
 
-    private const val PREFS_NAME = "PetRadarPrefs"
+    private const val PREFS_NAME          = "PetRadarPrefs"
+    private const val SECURE_PREFS_NAME   = "PetRadarSecurePrefs"
 
     // Keys for accessing values in SharedPreferences
     private const val KEY_AUTH_TOKEN    = "auth_token"
@@ -35,9 +39,34 @@ object AuthManager {
     private const val KEY_USER_NAME     = "user_name"
     private const val KEY_PROFILE_PHOTO = "profile_photo_url"
 
+    // Keys for encrypted credential storage
+    private const val KEY_SAVED_EMAIL    = "saved_email"
+    private const val KEY_SAVED_PASSWORD = "saved_password"
+
     /** Returns the SharedPreferences instance for the app. */
     private fun getPrefs(context: Context): SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /**
+     * Returns an [EncryptedSharedPreferences] instance backed by Android Keystore.
+     * Used to securely store user credentials for silent re-authentication.
+     * Returns null if the secure storage cannot be initialized (e.g., device doesn't support it).
+     */
+    private fun getSecurePrefs(context: Context): SharedPreferences? = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            SECURE_PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        Log.e("AuthManager", "Could not open EncryptedSharedPreferences", e)
+        null
+    }
 
     /**
      * Saves the JWT and the refresh token after a successful login.
@@ -156,6 +185,36 @@ object AuthManager {
     }
 
     /**
+     * Saves the user's credentials encrypted in the Android Keystore-backed store.
+     * Call this after every successful login so silent re-authentication is possible
+     * even when both the JWT and refresh token have expired.
+     *
+     * The data is protected by AES-256-GCM and is only readable by this app.
+     *
+     * @param context  App or Activity context.
+     * @param email    User email.
+     * @param password Plain-text password (encrypted at rest by EncryptedSharedPreferences).
+     */
+    fun saveCredentials(context: Context, email: String, password: String) {
+        getSecurePrefs(context)?.edit {
+            putString(KEY_SAVED_EMAIL, email)
+            putString(KEY_SAVED_PASSWORD, password)
+        }
+    }
+
+    /**
+     * Returns the email saved by [saveCredentials], or null if none is stored.
+     */
+    fun getSavedEmail(context: Context): String? =
+        getSecurePrefs(context)?.getString(KEY_SAVED_EMAIL, null)
+
+    /**
+     * Returns the password saved by [saveCredentials], or null if none is stored.
+     */
+    fun getSavedPassword(context: Context): String? =
+        getSecurePrefs(context)?.getString(KEY_SAVED_PASSWORD, null)
+
+    /**
      * Signs out the user by clearing all data stored in SharedPreferences.
      * After calling this method, [isAuthenticated] will return false.
      *
@@ -163,5 +222,6 @@ object AuthManager {
      */
     fun logout(context: Context) {
         getPrefs(context).edit { clear() }
+        getSecurePrefs(context)?.edit { clear() }
     }
 }
