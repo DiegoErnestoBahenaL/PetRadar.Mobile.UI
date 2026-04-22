@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 @Suppress("DEPRECATION")
@@ -97,6 +98,11 @@ dependencies {
     // OpenStreetMap — free map picker for lost report location
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+
+    implementation(libs.firebase.messaging)
+    implementation(libs.androidx.work.runtime.ktx)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -104,4 +110,6 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation("com.google.firebase:firebase-analytics")
 }
