@@ -17,7 +17,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.lang.ref.WeakReference
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 /**
  * Singleton that provides the configured [ApiService] instance for the entire app.
@@ -51,6 +56,26 @@ object RetrofitClient {
     }
 
     /**
+     * TrustManager that accepts all certificates.
+     * Required for the QA environment which uses a self-signed / private-CA certificate.
+     */
+    private val unsafeTrustManager = object : X509TrustManager {
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = Unit
+        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+    }
+
+    private val unsafeSslContext: SSLContext = SSLContext.getInstance("TLS").also {
+        it.init(null, arrayOf<TrustManager>(unsafeTrustManager), SecureRandom())
+    }
+
+    /** Applies the unsafe SSL configuration to any [OkHttpClient.Builder]. */
+    private fun OkHttpClient.Builder.trustAllCerts(): OkHttpClient.Builder = apply {
+        sslSocketFactory(unsafeSslContext.socketFactory, unsafeTrustManager)
+        hostnameVerifier { _, _ -> true }
+    }
+
+    /**
      * OkHttp logging interceptor.
      * Level BODY: logs the URL, headers and body of each request/response.
      * Useful for debugging; in production this should be set to NONE.
@@ -66,6 +91,7 @@ object RetrofitClient {
 
     private val refreshHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .trustAllCerts()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -125,6 +151,7 @@ object RetrofitClient {
      */
     val imageHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .trustAllCerts()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -190,6 +217,7 @@ object RetrofitClient {
      */
     val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .trustAllCerts()
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

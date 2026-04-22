@@ -44,8 +44,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -103,7 +107,8 @@ data class StrayReportFormData(
     val addressText: String?,
     val hasCollar: Boolean,
     val hasTag: Boolean,
-    val incidentDateIso: String
+    val incidentDateIso: String,
+    val size: String?
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +149,8 @@ fun StrayReportScreen(
     // ── Form toggles ───────────────────────────────────────────────────────────
     var hasCollar by remember { mutableStateOf(false) }
     var hasTag by remember { mutableStateOf(false) }
+    var selectedSize by remember { mutableStateOf<String?>(null) }
+    var sizeDropdownExpanded by remember { mutableStateOf(false) }
 
     // ── Photo launchers ────────────────────────────────────────────────────────
     val mainGalleryLauncher = rememberLauncherForActivityResult(
@@ -375,7 +382,7 @@ fun StrayReportScreen(
                                     .crossfade(true)
                                     .build(),
                                 contentDescription = "Foto principal",
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(220.dp)
@@ -676,6 +683,43 @@ fun StrayReportScreen(
                             enabled = !isLoading
                         )
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val sizeOptions = listOf(
+                        null to "Desconocido",
+                        "Small" to "Pequeño",
+                        "Medium" to "Mediano",
+                        "Large" to "Grande"
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = sizeDropdownExpanded,
+                        onExpandedChange = { sizeDropdownExpanded = !sizeDropdownExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = sizeOptions.find { it.first == selectedSize }?.second ?: "Desconocido",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tamaño aproximado") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sizeDropdownExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            enabled = !isLoading
+                        )
+                        ExposedDropdownMenu(
+                            expanded = sizeDropdownExpanded,
+                            onDismissRequest = { sizeDropdownExpanded = false }
+                        ) {
+                            sizeOptions.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        selectedSize = value
+                                        sizeDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -691,7 +735,8 @@ fun StrayReportScreen(
                         hasCollar = hasCollar,
                         hasTag = hasTag,
                         incidentDateIso = LocalDateTime.now()
-                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        size = selectedSize
                     )
                     val localMain = mainPhotoUri?.let { uri ->
                         val scheme = uri.scheme?.lowercase() ?: ""

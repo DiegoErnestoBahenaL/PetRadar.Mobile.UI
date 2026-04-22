@@ -336,7 +336,7 @@ fun LostPetReportScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(context).data(mainPhotoUri).crossfade(true).build(),
                                 contentDescription = "Foto principal",
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(10.dp))
                             )
                             IconButton(

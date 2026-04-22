@@ -3,6 +3,7 @@ package com.example.petradar.repository
 import com.example.petradar.api.AdoptionAnimalCreateModel
 import com.example.petradar.api.AdoptionAnimalUpdateModel
 import com.example.petradar.api.AdoptionAnimalViewModel
+import com.example.petradar.api.AdoptionRequest
 import com.example.petradar.api.RetrofitClient
 import okhttp3.MultipartBody
 import retrofit2.Response
@@ -104,5 +105,19 @@ class AdoptionAnimalRepository {
      */
     suspend fun deleteAdditionalPhoto(id: Long, photoName: String): Response<Unit> =
         api.deleteAdoptionAnimalAdditionalPhoto(id, photoName)
+
+    /**
+     * Submits an adoption request for an animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/adoptionrequest
+     */
+    suspend fun submitAdoptionRequest(id: Long, request: AdoptionRequest): Response<Unit> =
+        api.submitAdoptionRequest(id, request)
+
+    /**
+     * Approves an adoption request from a specific user.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/approveadoptionrequest/{adopterId}
+     */
+    suspend fun approveAdoptionRequest(id: Long, adopterId: Long): Response<Unit> =
+        api.approveAdoptionRequest(id, adopterId)
 }
 

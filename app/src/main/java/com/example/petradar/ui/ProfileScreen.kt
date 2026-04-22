@@ -37,7 +37,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.SubcomposeAsyncImage
+import coil.compose.SubcomposeAsyncImageContent
 import coil.request.ImageRequest
 import com.example.petradar.viewmodel.ProfileViewModel
 import java.io.File
@@ -274,8 +276,7 @@ fun ProfileScreen(
                     padding      = padding,
                     pictureUrl   = pictureUrl,
                     onRefresh    = { isRefreshing = true; viewModel.loadUserProfile(userId) },
-                    onEdit       = { editMode = true },
-                    onPickPhoto  = { showPhotoSheet = true }
+                    onEdit       = { editMode = true }
                 )
             }
         }
@@ -289,7 +290,8 @@ private fun ProfileAvatar(
     photoUrl: String?,
     displayName: String,
     size: Int = 96,
-    onClick: () -> Unit
+    showEditBadge: Boolean = true,
+    onClick: () -> Unit = {}
 ) {
     Box(contentAlignment = Alignment.BottomEnd) {
         Box(
@@ -297,22 +299,11 @@ private fun ProfileAvatar(
                 .size(size.dp)
                 .clip(CircleShape)
                 .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                .clickable(onClick = onClick),
+                .then(if (showEditBadge) Modifier.clickable(onClick = onClick) else Modifier),
             contentAlignment = Alignment.Center
         ) {
-            if (!photoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(photoUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Foto de perfil",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                )
-            } else {
+            val initial = displayName.firstOrNull()?.uppercase() ?: "?"
+            val placeholderContent: @Composable () -> Unit = {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -320,7 +311,7 @@ private fun ProfileAvatar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = displayName.firstOrNull()?.uppercase() ?: "?",
+                        text = initial,
                         style = if (size >= 96) MaterialTheme.typography.displayMedium
                                 else MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -328,22 +319,38 @@ private fun ProfileAvatar(
                     )
                 }
             }
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Foto de perfil",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(CircleShape)
+            ) {
+                when (painter.state) {
+                    is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                    else -> placeholderContent()
+                }
+            }
         }
-        // Camera badge
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Default.CameraAlt,
-                contentDescription = "Cambiar foto",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(16.dp)
-            )
+        // Camera badge - solo visible en modo edición
+        if (showEditBadge) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.CameraAlt,
+                    contentDescription = "Cambiar foto",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }
@@ -359,8 +366,7 @@ private fun ViewProfileContent(
     padding: PaddingValues,
     pictureUrl: String?,
     onRefresh: () -> Unit,
-    onEdit: () -> Unit,
-    onPickPhoto: () -> Unit
+    onEdit: () -> Unit
 ) {
     PullToRefreshBox(
         isRefreshing = isRefreshing,
@@ -388,7 +394,7 @@ private fun ViewProfileContent(
                             photoUrl = pictureUrl,
                             displayName = profile.name,
                             size = 96,
-                            onClick = onPickPhoto
+                            showEditBadge = false
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(

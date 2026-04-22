@@ -58,10 +58,35 @@ class AdoptionAnimalDetailActivity : ComponentActivity() {
                     viewModel = detailViewModel,
                     currentUserId = currentUserId,
                     adoptSuccess = adoptSuccess,
-                    onAdoptAnimal = { animal ->
+                    onAdoptAnimal = { animal, request ->
                         if (currentUserId > 0) {
-                            listViewModel.adoptAnimal(animal.id, currentUserId)
+                            listViewModel.submitAdoptionRequest(
+                                animalId = animal.id,
+                                request = request
+                            )
                         }
+                    },
+                    onApproveRequest = { adopterId ->
+                        listViewModel.approveAdoptionRequest(animalId, adopterId)
+                        if (animalId > 0) detailViewModel.loadAnimal(animalId)
+                    },
+                    onChatWithRequester = { userId, userName ->
+                        val intent = Intent(this, ChatActivity::class.java).apply {
+                            putExtra(ChatActivity.EXTRA_ADOPTION_ANIMAL_ID, animalId)
+                            putExtra(ChatActivity.EXTRA_OTHER_USER_ID, userId)
+                            putExtra(ChatActivity.EXTRA_ANIMAL_NAME, detailViewModel.animal.value?.name)
+                            putExtra(ChatActivity.EXTRA_OTHER_USER_NAME, userName)
+                        }
+                        startActivity(intent)
+                    },
+                    onChatWithOwner = {
+                        val animal = detailViewModel.animal.value ?: return@AdoptionAnimalDetailScreen
+                        val intent = Intent(this, ChatActivity::class.java).apply {
+                            putExtra(ChatActivity.EXTRA_ADOPTION_ANIMAL_ID, animalId)
+                            putExtra(ChatActivity.EXTRA_OTHER_USER_ID, animal.shelterId)
+                            putExtra(ChatActivity.EXTRA_ANIMAL_NAME, animal.name)
+                        }
+                        startActivity(intent)
                     },
                     onEditAnimal = {
                         val intent = Intent(this, AdoptionAnimalFormActivity::class.java)

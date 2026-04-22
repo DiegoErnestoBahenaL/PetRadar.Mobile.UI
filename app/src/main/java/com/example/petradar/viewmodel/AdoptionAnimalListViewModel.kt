@@ -4,13 +4,10 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.petradar.api.AdoptionAnimalUpdateModel
 import com.example.petradar.api.AdoptionAnimalViewModel
+import com.example.petradar.api.AdoptionRequest
 import com.example.petradar.repository.AdoptionAnimalRepository
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * ViewModel that manages the business logic for the adoption animals list.
@@ -80,6 +77,7 @@ class AdoptionAnimalListViewModel : ViewModel() {
      * @param animalId ID of the adoption animal to delete.
      */
     fun deleteAnimal(animalId: Long) {
+        _animals.value = _animals.value?.filter { it.id != animalId }
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
@@ -91,10 +89,12 @@ class AdoptionAnimalListViewModel : ViewModel() {
                 } else {
                     _errorMessage.value = "Error deleting adoption animal: ${response.code()}"
                     _deleteSuccess.value = false
+                    loadAnimals()
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Connection error: ${e.message}"
                 _deleteSuccess.value = false
+                loadAnimals()
             } finally {
                 _isLoading.value = false
             }
@@ -102,35 +102,56 @@ class AdoptionAnimalListViewModel : ViewModel() {
     }
 
     /**
-     * Marks an animal as adopted by the current user and reloads the adoption animals list.
-     * Endpoint: PUT /api/AdoptionAnimals/{id}
+     * Submits an adoption request for an animal and notifies the owner.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/adoptionrequest
      *
-     * @param animalId ID of the animal to mark as adopted.
-     * @param adopterId ID of the adopter (current user).
+     * @param animalId   ID of the animal.
+     * @param request    Adoption request data filled in by the user.
      */
-    fun adoptAnimal(animalId: Long, adopterId: Long) {
+    fun submitAdoptionRequest(
+        animalId: Long,
+        request: AdoptionRequest
+    ) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             try {
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
-                val response = repository.update(
-                    animalId,
-                    AdoptionAnimalUpdateModel(
-                        status = "Adopted",
-                        adoptionDate = today,
-                        adopterId = adopterId
-                    )
-                )
+                val response = repository.submitAdoptionRequest(animalId, request)
                 if (response.isSuccessful) {
                     _adoptSuccess.value = true
                     loadAnimals()
                 } else {
                     _adoptSuccess.value = false
-                    _errorMessage.value = "Error al solicitar la adopción: ${response.code()}"
+                    _errorMessage.value = "Error al enviar la solicitud: ${response.code()}"
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Connection error: ${e.message}"
+                _errorMessage.value = "Error de conexión: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /**
+     * Approves an adoption request from a specific user and reloads the list.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/approveadoptionrequest/{adopterId}
+     *
+     * @param animalId  ID of the animal.
+     * @param adopterId ID of the user whose request is being approved.
+     */
+    fun approveAdoptionRequest(animalId: Long, adopterId: Long) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                val response = repository.approveAdoptionRequest(animalId, adopterId)
+                if (response.isSuccessful) {
+                    loadAnimals()
+                } else {
+                    _errorMessage.value = "Error al aprobar la solicitud: ${response.code()}"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
