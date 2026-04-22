@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1035352259933",
+    "project_id": "petradar-d028d",
+    "storage_bucket": "petradar-d028d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1035352259933:android:451f36442cd166e0c9fcb4",
+        "android_client_info": {
+          "package_name": "com.example.petradar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXPCuNLdI8VC6XyuScl4CB2sNMbJYxXlU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
