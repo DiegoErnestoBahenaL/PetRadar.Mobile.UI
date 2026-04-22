@@ -10,7 +10,6 @@ import com.example.petradar.ui.AdoptionAnimalsScreen
 import com.example.petradar.ui.theme.PetRadarTheme
 import com.example.petradar.utils.AuthManager
 import com.example.petradar.viewmodel.AdoptionAnimalListViewModel
-import com.example.petradar.viewmodel.AdoptionAnimalDetailViewModel
 
 /**
  * AdoptionAnimalsActivity displays the list of animals available for adoption
@@ -50,11 +49,6 @@ class AdoptionAnimalsActivity : ComponentActivity() {
                         val intent = Intent(this, AdoptionAnimalDetailActivity::class.java)
                         intent.putExtra(AdoptionAnimalDetailActivity.EXTRA_ANIMAL_ID, animal.id)
                         startActivity(intent)
-                    },
-                    onAdoptAnimal = { animal ->
-                        if (currentUserId > 0) {
-                            viewModel.adoptAnimal(animal.id, currentUserId)
-                        }
                     },
                     onEditAnimal = { animal ->
                         val intent = Intent(this, AdoptionAnimalFormActivity::class.java)

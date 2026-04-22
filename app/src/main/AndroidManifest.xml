@@ -123,6 +123,11 @@
             android:exported="false"
             android:label="Seleccionar Mascota"
             android:parentActivityName=".MyReportsActivity" />
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:label="Chat"
+            android:parentActivityName=".AdoptionAnimalDetailActivity" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
