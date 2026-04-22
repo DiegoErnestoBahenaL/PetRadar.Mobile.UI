@@ -241,7 +241,7 @@ private fun ReportCard(
                         .crossfade(true)
                         .build(),
                     contentDescription = "Foto del reporte",
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
             }

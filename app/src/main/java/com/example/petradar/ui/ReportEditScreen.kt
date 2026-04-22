@@ -10,6 +10,11 @@ import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +29,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -73,7 +80,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -120,6 +130,7 @@ fun ReportEditScreen(
     var pendingAdditionalPhotos by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoSourceDialog by remember { mutableStateOf(false) }
+    var fullscreenPhotoData by remember { mutableStateOf<Any?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) mainPhotoUri = uri
@@ -375,6 +386,7 @@ fun ReportEditScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -443,11 +455,12 @@ fun ReportEditScreen(
                                         .crossfade(true)
                                         .build(),
                                     contentDescription = "Foto principal del reporte",
-                                    contentScale = ContentScale.Crop,
+                                    contentScale = ContentScale.Fit,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(200.dp)
                                         .clip(RoundedCornerShape(10.dp))
+                                        .clickable { fullscreenPhotoData = displayPhoto }
                                 )
                                 IconButton(
                                     onClick = { showPhotoSourceDialog = true },
@@ -790,6 +803,48 @@ fun ReportEditScreen(
             }
         }
     }
+
+    // Visor a pantalla completa de la foto del reporte
+    AnimatedVisibility(
+        visible = fullscreenPhotoData != null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.fillMaxSize().zIndex(10f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            fullscreenPhotoData?.let { data ->
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(data)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Foto del reporte",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            IconButton(
+                onClick = { fullscreenPhotoData = null },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .statusBarsPadding()
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Cerrar",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+    } // closes outer Box
 
     DisposableEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName

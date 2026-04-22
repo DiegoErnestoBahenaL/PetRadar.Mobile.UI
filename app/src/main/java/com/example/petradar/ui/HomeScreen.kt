@@ -8,11 +8,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -29,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -123,6 +128,9 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) { visible = true }
 
+    var showProfilePhotoFullscreen by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -141,7 +149,10 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
+                                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
+                                .clickable(enabled = !profilePhotoUrl.isNullOrBlank()) {
+                                    showProfilePhotoFullscreen = true
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             if (!profilePhotoUrl.isNullOrBlank()) {
@@ -327,7 +338,10 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)),
+                                    .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f))
+                                    .clickable(enabled = !profilePhotoUrl.isNullOrBlank()) {
+                                        showProfilePhotoFullscreen = true
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!profilePhotoUrl.isNullOrBlank()) {
@@ -417,6 +431,47 @@ fun HomeScreen(
             } // PullToRefreshBox
         }
     }
+
+    // Visor de foto de perfil a pantalla completa
+    AnimatedVisibility(
+        visible = showProfilePhotoFullscreen && !profilePhotoUrl.isNullOrBlank(),
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.fillMaxSize().zIndex(10f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(profilePhotoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Foto de perfil",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+            IconButton(
+                onClick = { showProfilePhotoFullscreen = false },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+                    .statusBarsPadding()
+                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Cerrar",
+                    tint = Color.White
+                )
+            }
+        }
+    }
+    } // closes outer Box
+
 }
 
 @Composable

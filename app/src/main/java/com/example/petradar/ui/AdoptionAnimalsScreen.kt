@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -36,7 +37,6 @@ fun AdoptionAnimalsScreen(
     currentUserId: Long,
     onAddAnimal: () -> Unit,
     onAnimalClick: (AdoptionAnimalViewModel) -> Unit,
-    onAdoptAnimal: (AdoptionAnimalViewModel) -> Unit,
     onEditAnimal: (AdoptionAnimalViewModel) -> Unit,
     onDeleteAnimal: (AdoptionAnimalViewModel) -> Unit,
     onBack: () -> Unit
@@ -50,13 +50,19 @@ fun AdoptionAnimalsScreen(
         }.distinctBy { it.id }
     }
 
+    val myRequestsAnimals = remember(animals, currentUserId) {
+        animals.filter { animal ->
+            animal.adoptionRequests?.any { it.userId == currentUserId } == true
+        }.distinctBy { it.id }
+    }
+
+    var selectedTab by remember { mutableStateOf(0) }
+    val activeAnimals = if (selectedTab == 0) displayAnimals else myRequestsAnimals
+
     val isLoadingState by viewModel.isLoading.observeAsState(false)
     val isLoading = isLoadingState
     val errorMessage by viewModel.errorMessage.observeAsState()
-    val adoptSuccess by viewModel.adoptSuccess.observeAsState(null)
 
-    var animalToAdopt by remember { mutableStateOf<AdoptionAnimalViewModel?>(null) }
-    var showAdoptDialog by remember { mutableStateOf(false) }
     var animalToDelete by remember { mutableStateOf<AdoptionAnimalViewModel?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -66,31 +72,6 @@ fun AdoptionAnimalsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(errorMessage) {
         errorMessage?.let { snackbarHostState.showSnackbar(it) }
-    }
-    LaunchedEffect(adoptSuccess) {
-        if (adoptSuccess == true) {
-            snackbarHostState.showSnackbar("¡Solicitud de adopción enviada con éxito!")
-        }
-    }
-
-    // Adopt confirmation dialog
-    if (showAdoptDialog && animalToAdopt != null) {
-        AlertDialog(
-            onDismissRequest = { showAdoptDialog = false; animalToAdopt = null },
-            icon = { Icon(Icons.Default.Favorite, null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text("Confirmar adopción") },
-            text = { Text("¿Deseas iniciar la adopción de ${animalToAdopt?.name ?: "este animal"}?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    animalToAdopt?.let(onAdoptAnimal)
-                    showAdoptDialog = false
-                    animalToAdopt = null
-                }) { Text("Adoptar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAdoptDialog = false; animalToAdopt = null }) { Text("Cancelar") }
-            }
-        )
     }
 
     // Delete confirmation dialog
@@ -118,14 +99,30 @@ fun AdoptionAnimalsScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Adopciones", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
-                    }
-                },
-            )
+            Column {
+                TopAppBar(
+                    title = { Text("Adopciones", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
+                        }
+                    },
+                )
+                PrimaryTabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("Todos") },
+                        icon = { Icon(Icons.Default.Pets, contentDescription = null) }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Mis solicitudes") },
+                        icon = { Icon(Icons.Default.Bookmark, contentDescription = null) }
+                    )
+                }
+            }
         },
         floatingActionButton = {
             if (!isLoading) {
@@ -146,11 +143,15 @@ fun AdoptionAnimalsScreen(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
-                    isLoading && displayAnimals.isEmpty() -> {
+                    isLoading && activeAnimals.isEmpty() -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
-                    displayAnimals.isEmpty() -> {
-                        EmptyAdoptionMessage(modifier = Modifier.align(Alignment.Center))
+                    activeAnimals.isEmpty() -> {
+                        if (selectedTab == 1) {
+                            EmptyRequestsMessage(modifier = Modifier.align(Alignment.Center))
+                        } else {
+                            EmptyAdoptionMessage(modifier = Modifier.align(Alignment.Center))
+                        }
                     }
                     else -> {
                         LazyVerticalGrid(
@@ -160,14 +161,15 @@ fun AdoptionAnimalsScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            items(items = displayAnimals, key = { it.id }) { animal ->
+                            items(items = activeAnimals, key = { it.id }) { animal ->
                                 val isOwner = animal.shelterId == currentUserId
+                                val hasSentRequest = !isOwner &&
+                                    animal.adoptionRequests?.any { it.userId == currentUserId } == true
                                 AdoptionAnimalGridCard(
                                     animal = animal,
                                     isOwner = isOwner,
-                                    canAdopt = currentUserId > 0 && !isOwner,
+                                    hasSentRequest = hasSentRequest,
                                     onClick = { onAnimalClick(animal) },
-                                    onAdopt = { animalToAdopt = animal; showAdoptDialog = true },
                                     onEdit = { onEditAnimal(animal) },
                                     onDelete = { animalToDelete = animal; showDeleteDialog = true }
                                 )
@@ -178,6 +180,33 @@ fun AdoptionAnimalsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EmptyRequestsMessage(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Bookmark,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = "Sin solicitudes enviadas",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
+        Text(
+            text = "Aquí verás los animales a los que hayas solicitado adoptar",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        )
     }
 }
 
@@ -212,9 +241,8 @@ private fun EmptyAdoptionMessage(modifier: Modifier = Modifier) {
 private fun AdoptionAnimalGridCard(
     animal: AdoptionAnimalViewModel,
     isOwner: Boolean,
-    canAdopt: Boolean,
+    hasSentRequest: Boolean,
     onClick: () -> Unit,
-    onAdopt: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -250,17 +278,17 @@ private fun AdoptionAnimalGridCard(
     val photoUrl = PetImageUrlResolver.adoptionMainPictureEndpoint(animal.id)
 
     Card(
-        onClick = if (isOwner) onEdit else onClick,
-        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
-        Column {
+        Column(modifier = Modifier.fillMaxHeight()) {
             // Photo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(180.dp)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
@@ -270,7 +298,7 @@ private fun AdoptionAnimalGridCard(
                         .crossfade(true)
                         .build(),
                     contentDescription = animal.name,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
@@ -289,27 +317,85 @@ private fun AdoptionAnimalGridCard(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                // "Mi publicación" badge for owner
+                // Badges y botones de acción en la esquina superior izquierda
+                when {
+                    isOwner -> {
+                        Surface(
+                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                text = "Mía",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                    hasSentRequest -> {
+                        Surface(
+                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "Solicitado",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
                 if (isOwner) {
-                    Surface(
-                        modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "Mía",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Surface(
+                            onClick = onEdit,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Editar",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Surface(
+                            onClick = onDelete,
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Eliminar",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
 
             // Info
             Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
@@ -330,39 +416,6 @@ private fun AdoptionAnimalGridCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
-                }
-            }
-
-            // Action buttons
-            if (isOwner) {
-                // Owner: delete only (card tap = edit)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .padding(bottom = 4.dp),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Eliminar",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            } else {
-                // Other users: adopt button
-                Button(
-                    onClick = onAdopt,
-                    enabled = canAdopt && animal.status.equals("Available", ignoreCase = true),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp)
-                        .padding(bottom = 10.dp)
-                ) {
-                    Text("Adoptar", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }

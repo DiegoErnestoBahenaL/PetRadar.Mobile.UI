@@ -517,7 +517,97 @@ interface ApiService {
         @Path("id") id: Long,
         @Path("photoName") photoName: String
     ): Response<Unit>
+
+    /**
+     * Submits an adoption request for an animal.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/adoptionrequest
+     *
+     * @param id      Adoption animal ID.
+     * @param request Adoption request data ([AdoptionRequest]).
+     * @return HTTP 204 No Content on success.
+     */
+    @PUT("api/AdoptionAnimals/{id}/adoptionrequest")
+    suspend fun submitAdoptionRequest(
+        @Path("id") id: Long,
+        @Body request: AdoptionRequest
+    ): Response<Unit>
+
+    /**
+     * Approves an adoption request from a specific user.
+     * Endpoint: PUT /api/AdoptionAnimals/{id}/approveadoptionrequest/{adopterId}
+     *
+     * @param id        Adoption animal ID.
+     * @param adopterId ID of the user whose request is being approved.
+     * @return HTTP 204 No Content on success.
+     */
+    @PUT("api/AdoptionAnimals/{id}/approveadoptionrequest/{adopterId}")
+    suspend fun approveAdoptionRequest(
+        @Path("id") id: Long,
+        @Path("adopterId") adopterId: Long
+    ): Response<Unit>
+
+    // =========================================================================
+    // Messages  →  /api/Messages
+    // =========================================================================
+
+    /**
+     * Returns the conversation between two users for a specific adoption animal.
+     * Endpoint: GET /api/Messages/adoptionAnimal/{adoptionAnimalId}/conversation/{recipientId}/{senderId}
+     */
+    @GET("api/Messages/adoptionAnimal/{adoptionAnimalId}/conversation/{recipientId}/{senderId}")
+    suspend fun getAdoptionAnimalConversation(
+        @Path("adoptionAnimalId") adoptionAnimalId: Long,
+        @Path("recipientId") recipientId: Long,
+        @Path("senderId") senderId: Long
+    ): Response<List<MessageModel>>
+
+    /**
+     * Sends a new message.
+     * Endpoint: POST /api/Messages
+     */
+    @POST("api/Messages")
+    suspend fun sendMessage(@Body message: MessageCreateModel): Response<Unit>
+
+    /**
+     * Marks a message as read (or updates its content).
+     * Endpoint: PUT /api/Messages/{id}
+     */
+    @PUT("api/Messages/{id}")
+    suspend fun updateMessage(
+        @Path("id") id: Long,
+        @Body update: MessageUpdateModel
+    ): Response<Unit>
 }
+
+// =============================================================================
+// Data models for Messages
+// =============================================================================
+
+data class MessageModel(
+    val id: Long,
+    val senderId: Long,
+    val recipientId: Long,
+    val matchId: Long? = null,
+    val adoptionAnimalId: Long? = null,
+    val content: String? = null,
+    val read: Boolean = false,
+    val sentAt: String,
+    val readDate: String? = null
+)
+
+data class MessageCreateModel(
+    val senderId: Long,
+    val recipientId: Long,
+    val content: String,
+    val matchId: Long? = null,
+    val adoptionAnimalId: Long? = null
+)
+
+data class MessageUpdateModel(
+    val content: String? = null,
+    val read: Boolean? = null,
+    val readDate: String? = null
+)
 
 // =============================================================================
 // Data models for Veterinary Appointments
@@ -802,6 +892,27 @@ data class ReportUpdateModel(
 // =============================================================================
 
 /**
+ * Payload for submitting or reading an adoption request (AdoptionRequest in Swagger).
+ */
+data class AdoptionRequest(
+    val userId: Long,
+    val name: String? = null,
+    val phoneNumber: String? = null,
+    val address: String? = null,
+    val houseType: String? = null,
+    val hasGarden: Boolean = false,
+    val livesWith: String? = null,
+    val hasOtherPets: Boolean = false,
+    val otherPetsDescription: String? = null,
+    val previousExperience: String? = null,
+    val experience: String? = null,
+    val adoptionReason: String? = null,
+    val acceptsFollowUpVisits: Boolean = false,
+    val sendsPhotos: Boolean = false,
+    val additionalComments: String? = null
+)
+
+/**
  * Represents an adoption animal as returned by the API (AdoptionAnimalViewModel in Swagger).
  *
  * @property id                  Unique adoption animal ID in the database.
@@ -829,6 +940,7 @@ data class ReportUpdateModel(
  * @property adoptionDate        Date of adoption in ISO-8601 (may be null).
  * @property adopterId           ID of the adopter (may be null).
  * @property views               Number of views.
+ * @property adoptionRequests    List of adoption requests submitted by interested users.
  */
 data class AdoptionAnimalViewModel(
     val id: Long,
@@ -855,7 +967,8 @@ data class AdoptionAnimalViewModel(
     val status: String?,
     val adoptionDate: String?,
     val adopterId: Long?,
-    val views: Int
+    val views: Int,
+    val adoptionRequests: List<AdoptionRequest>? = null
 )
 
 /**

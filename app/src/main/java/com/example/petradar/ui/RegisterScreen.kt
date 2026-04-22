@@ -136,7 +136,7 @@ fun RegisterScreen(
 
     // Photo source bottom sheet
     if (showPhotoSheet) {
-        ModalBottomSheet(onDismissRequest = { }) {
+        ModalBottomSheet(onDismissRequest = { showPhotoSheet = false }) {
             Column(modifier = Modifier.padding(bottom = 32.dp)) {
                 Text("Foto de perfil", style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -145,6 +145,7 @@ fun RegisterScreen(
                     headlineContent = { Text("Tomar foto") },
                     leadingContent = { Icon(Icons.Default.CameraAlt, null) },
                     modifier = Modifier.clickable {
+                        showPhotoSheet = false
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
                             == android.content.pm.PackageManager.PERMISSION_GRANTED) {
                             val uri = createCameraUri()
@@ -158,7 +159,10 @@ fun RegisterScreen(
                 ListItem(
                     headlineContent = { Text("Elegir de la galería") },
                     leadingContent = { Icon(Icons.Default.PhotoLibrary, null) },
-                    modifier = Modifier.clickable { galleryLauncher.launch("image/*") }
+                    modifier = Modifier.clickable {
+                        showPhotoSheet = false
+                        galleryLauncher.launch("image/*")
+                    }
                 )
             }
         }
