@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.example.petradar.PetRadarMessagingService
 import com.example.petradar.api.models.LoginResponse
 import com.example.petradar.api.models.UserProfile
 import com.example.petradar.repository.AuthRepository
@@ -202,6 +203,13 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             if (user != null) {
+                // Register this device's FCM token now that a userId is persisted.
+                // onNewToken typically fires on first install (before login), so the
+                // token is never sent from there on a fresh account.
+                viewModelScope.launch {
+                    PetRadarMessagingService.syncFcmTokenForCurrentUser(getApplication())
+                }
+
                 if (user.emailVerified) {
                     _loginSuccess.value = true
                 } else {
