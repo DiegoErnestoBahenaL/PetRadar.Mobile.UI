@@ -132,3 +132,8 @@ crash_logs/
 !.vscode/launch.json
 !.vscode/extensions.json
 
+#claude
+.claude/
+
+#google-services.json
+google-services.json
