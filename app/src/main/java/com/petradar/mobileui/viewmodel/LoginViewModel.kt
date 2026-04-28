@@ -6,7 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import com.example.petradar.PetRadarMessagingService
+import com.petradar.mobileui.PetRadarMessagingService
 import com.petradar.mobileui.api.models.LoginResponse
 import com.petradar.mobileui.api.models.UserProfile
 import com.petradar.mobileui.repository.AuthRepository

@@ -135,3 +135,5 @@ crash_logs/
 #claude
 .claude/
 
+#google-services.json
+google-services.json

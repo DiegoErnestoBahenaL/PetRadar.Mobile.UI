@@ -1,7 +1,7 @@
 ﻿package com.petradar.mobileui.repository
 
 import com.petradar.mobileui.api.RetrofitClient
-import com.example.petradar.api.models.UpdateFcmTokenRequest
+import com.petradar.mobileui.api.models.UpdateFcmTokenRequest
 import com.petradar.mobileui.api.models.UpdateProfileRequest
 import com.petradar.mobileui.api.models.UserProfile
 import okhttp3.MultipartBody

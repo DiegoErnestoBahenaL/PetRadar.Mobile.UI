@@ -1,4 +1,4 @@
-package com.example.petradar
+package com.petradar.mobileui
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,9 +11,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
-import com.example.petradar.api.models.UpdateFcmTokenRequest
-import com.example.petradar.repository.UserRepository
-import com.example.petradar.utils.AuthManager
+import com.petradar.mobileui.api.models.UpdateFcmTokenRequest
+import com.petradar.mobileui.repository.UserRepository
+import com.petradar.mobileui.utils.AuthManager
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage

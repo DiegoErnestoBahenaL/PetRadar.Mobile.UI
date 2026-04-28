@@ -1,4 +1,4 @@
-package com.example.petradar.api.models
+package com.petradar.mobileui.api.models
 
 import com.google.gson.annotations.SerializedName
 
