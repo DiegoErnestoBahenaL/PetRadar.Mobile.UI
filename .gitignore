@@ -135,3 +135,8 @@ crash_logs/
 # Session tracking
 IMPLEMENTATION_TRACK.md
 
+#claude
+.claude/
+
+#google-services.json
+google-services.json
