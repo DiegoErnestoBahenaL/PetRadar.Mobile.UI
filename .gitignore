@@ -132,3 +132,6 @@ crash_logs/
 !.vscode/launch.json
 !.vscode/extensions.json
 
+# Session tracking
+IMPLEMENTATION_TRACK.md
+

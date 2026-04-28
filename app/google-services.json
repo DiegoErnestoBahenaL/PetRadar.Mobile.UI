@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1035352259933:android:451f36442cd166e0c9fcb4",
+        "mobilesdk_app_id": "1:1035352259933:android:8dc4f935d937e989c9fcb4",
         "android_client_info": {
-          "package_name": "com.example.petradar"
+          "package_name": "com.petradar.mobileui"
         }
       },
       "oauth_client": [],
