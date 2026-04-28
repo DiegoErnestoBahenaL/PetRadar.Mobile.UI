@@ -92,6 +92,12 @@ interface ApiService {
         @Body request: UpdateProfileRequest
     ): Response<Unit>
 
+    @PUT("api/Users/{id}/fcm-token")
+    suspend fun updateFcmToken(
+        @Path("id") userId: Long,
+        @Body request: UpdateFcmTokenRequest
+    ): Response<Unit>
+
     /**
      * Deletes a user by their ID.
      * Endpoint: DELETE /api/Users/{id}

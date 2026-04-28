@@ -1,6 +1,7 @@
 ﻿package com.petradar.mobileui.repository
 
 import com.petradar.mobileui.api.RetrofitClient
+import com.example.petradar.api.models.UpdateFcmTokenRequest
 import com.petradar.mobileui.api.models.UpdateProfileRequest
 import com.petradar.mobileui.api.models.UserProfile
 import okhttp3.MultipartBody
@@ -16,6 +17,8 @@ class UserRepository {
     suspend fun updateUser(userId: Long, request: UpdateProfileRequest): Response<Unit> =
         apiService.updateUser(userId, request)
 
+    suspend fun updateFcmToken(userId: Long, token: UpdateFcmTokenRequest): Response<Unit> =
+        apiService.updateFcmToken(userId, token)
     suspend fun getAllUsers(): Response<List<UserProfile>> =
         apiService.getAllUsers()
 
