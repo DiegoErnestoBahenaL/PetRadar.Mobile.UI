@@ -6,11 +6,11 @@ plugins {
 
 @Suppress("DEPRECATION")
 android {
-    namespace = "com.example.petradar"
+    namespace = "com.petradar.mobileui"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.petradar"
+        applicationId = "com.petradar.mobileui"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
