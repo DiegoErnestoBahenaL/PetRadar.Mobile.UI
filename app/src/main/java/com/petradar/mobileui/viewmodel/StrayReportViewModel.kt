@@ -45,11 +45,16 @@ class StrayReportViewModel : ViewModel() {
                     if (context != null) {
                         val createdReportId = resolveCreatedReportId(request.userId)
                         if (createdReportId != null) {
-                            if (!photoUri.isNullOrBlank()) {
-                                uploadMainPicture(createdReportId, photoUri, context)
-                            }
-                            if (additionalPhotoUris.isNotEmpty()) {
-                                uploadAdditionalPhotos(createdReportId, additionalPhotoUris, context)
+                            try {
+                                if (!photoUri.isNullOrBlank()) {
+                                    uploadMainPicture(createdReportId, photoUri, context)
+                                }
+                                if (additionalPhotoUris.isNotEmpty()) {
+                                    uploadAdditionalPhotos(createdReportId, additionalPhotoUris, context)
+                                }
+                            } catch (_: Exception) {
+                                // El reporte ya fue creado; si la subida de foto falla
+                                // por timeout u otro error de red, no bloqueamos el éxito.
                             }
                         }
                     }

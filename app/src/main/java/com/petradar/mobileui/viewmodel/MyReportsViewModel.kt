@@ -1,4 +1,4 @@
-﻿package com.petradar.mobileui.viewmodel
+package com.petradar.mobileui.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.petradar.mobileui.api.MatchViewModel
 import com.petradar.mobileui.api.ReportViewModel
 import com.petradar.mobileui.repository.MatchRepository
+import com.petradar.mobileui.repository.MessageRepository
 import com.petradar.mobileui.repository.ReportRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -15,12 +16,16 @@ class MyReportsViewModel : ViewModel() {
 
     private val reportRepository = ReportRepository()
     private val matchRepository = MatchRepository()
+    private val messageRepository = MessageRepository()
 
     private val _reports = MutableLiveData<List<ReportViewModel>>(emptyList())
     val reports: LiveData<List<ReportViewModel>> = _reports
 
     private val _matchesByReportId = MutableLiveData<Map<Long, List<MatchViewModel>>>(emptyMap())
     val matchesByReportId: LiveData<Map<Long, List<MatchViewModel>>> = _matchesByReportId
+
+    private val _unreadCountByMatchId = MutableLiveData<Map<Long, Int>>(emptyMap())
+    val unreadCountByMatchId: LiveData<Map<Long, Int>> = _unreadCountByMatchId
 
     private val _isLoading = MutableLiveData(false)
     val isLoading: LiveData<Boolean> = _isLoading
@@ -61,12 +66,38 @@ class MyReportsViewModel : ViewModel() {
                         map.getOrPut(match.strayReport.id) { mutableListOf() }.add(match)
                     }
                     _matchesByReportId.value = map
+                    loadUnreadCounts(userId, allMatches)
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    private fun loadUnreadCounts(userId: Long, allMatches: List<MatchViewModel>) {
+        viewModelScope.launch {
+            val counts = mutableMapOf<Long, Int>()
+            val tasks = allMatches.map { match ->
+                val otherUserId = if (match.lostReport.userId == userId)
+                    match.strayReport.userId
+                else
+                    match.lostReport.userId
+                match.id to async {
+                    runCatching {
+                        val r = messageRepository.getMatchConversation(match.id, otherUserId, userId)
+                        if (r.isSuccessful) r.body().orEmpty()
+                            .count { !it.read && it.recipientId == userId }
+                        else 0
+                    }.getOrDefault(0)
+                }
+            }
+            for ((matchId, deferred) in tasks) {
+                val count = deferred.await()
+                if (count > 0) counts[matchId] = count
+            }
+            _unreadCountByMatchId.value = counts
         }
     }
 
