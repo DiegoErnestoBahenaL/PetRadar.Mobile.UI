@@ -81,14 +81,19 @@ class LostPetReportViewModel : ViewModel() {
                     if (context != null) {
                         val createdReportId = resolveCreatedReportId(request.userId)
                         if (createdReportId != null) {
-                            if (!photoUri.isNullOrBlank()) {
-                                uploadReportMainPicture(createdReportId, photoUri, context)
-                            }
-                            // Auto-copy the pet's additional photos to the report
-                            val petId = request.userPetId ?: 0L
-                            val petPhotoNames = _petAdditionalPhotoNames.value.orEmpty()
-                            if (petId > 0 && petPhotoNames.isNotEmpty()) {
-                                copyPetPhotosToReport(petId, petPhotoNames, createdReportId)
+                            try {
+                                if (!photoUri.isNullOrBlank()) {
+                                    uploadReportMainPicture(createdReportId, photoUri, context)
+                                }
+                                // Auto-copy the pet's additional photos to the report
+                                val petId = request.userPetId ?: 0L
+                                val petPhotoNames = _petAdditionalPhotoNames.value.orEmpty()
+                                if (petId > 0 && petPhotoNames.isNotEmpty()) {
+                                    copyPetPhotosToReport(petId, petPhotoNames, createdReportId)
+                                }
+                            } catch (_: Exception) {
+                                // El reporte ya fue creado; si la subida de foto falla
+                                // por timeout u otro error de red, no bloqueamos el éxito.
                             }
                         }
                     }

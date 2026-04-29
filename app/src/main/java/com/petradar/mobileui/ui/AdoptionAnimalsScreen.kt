@@ -1,4 +1,4 @@
-﻿@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.petradar.mobileui.ui
 
@@ -42,6 +42,7 @@ fun AdoptionAnimalsScreen(
     onBack: () -> Unit
 ) {
     val animals by viewModel.animals.observeAsState(emptyList())
+    val unreadCountByAnimalId by viewModel.unreadCountByAnimalId.observeAsState(emptyMap())
 
     // Show all Available animals + all the user's own (regardless of status), deduplicated
     val displayAnimals = remember(animals, currentUserId) {
@@ -138,7 +139,7 @@ fun AdoptionAnimalsScreen(
     ) { paddingValues ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = { isRefreshing = true; viewModel.loadAnimals() },
+            onRefresh = { isRefreshing = true; viewModel.loadAnimals(currentUserId) },
             modifier = Modifier.fillMaxSize().padding(paddingValues)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -165,10 +166,14 @@ fun AdoptionAnimalsScreen(
                                 val isOwner = animal.shelterId == currentUserId
                                 val hasSentRequest = !isOwner &&
                                     animal.adoptionRequests?.any { it.userId == currentUserId } == true
+                                val requestCount = if (isOwner) animal.adoptionRequests?.size ?: 0 else 0
+                                val unreadCount = unreadCountByAnimalId[animal.id] ?: 0
                                 AdoptionAnimalGridCard(
                                     animal = animal,
                                     isOwner = isOwner,
                                     hasSentRequest = hasSentRequest,
+                                    requestCount = requestCount,
+                                    unreadCount = unreadCount,
                                     onClick = { onAnimalClick(animal) },
                                     onEdit = { onEditAnimal(animal) },
                                     onDelete = { animalToDelete = animal; showDeleteDialog = true }
@@ -242,6 +247,8 @@ private fun AdoptionAnimalGridCard(
     animal: AdoptionAnimalViewModel,
     isOwner: Boolean,
     hasSentRequest: Boolean,
+    requestCount: Int,
+    unreadCount: Int,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -416,6 +423,45 @@ private fun AdoptionAnimalGridCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
+                }
+                if (isOwner && requestCount > 0) {
+                    Spacer(Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Bookmark,
+                            contentDescription = null,
+                            modifier = Modifier.size(11.dp),
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = if (requestCount == 1) "1 solicitud" else "$requestCount solicitudes",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                if (unreadCount > 0) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Forum,
+                            contentDescription = null,
+                            modifier = Modifier.size(11.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = if (unreadCount == 1) "1 sin leer" else "$unreadCount sin leer",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }

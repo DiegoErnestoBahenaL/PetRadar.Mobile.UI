@@ -25,16 +25,17 @@ import com.petradar.mobileui.viewmodel.AdoptionAnimalListViewModel
 class AdoptionAnimalsActivity : ComponentActivity() {
 
     private lateinit var viewModel: AdoptionAnimalListViewModel
+    private var currentUserId: Long = -1L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        val currentUserId = AuthManager.getUserId(this) ?: -1L
+        currentUserId = AuthManager.getUserId(this) ?: -1L
 
         viewModel = ViewModelProvider(this)[AdoptionAnimalListViewModel::class.java]
         // Initial load of adoption animals on screen open.
-        viewModel.loadAnimals()
+        viewModel.loadAnimals(currentUserId)
 
         setContent {
             PetRadarTheme {
@@ -70,7 +71,7 @@ class AdoptionAnimalsActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
-        viewModel.loadAnimals()
+        viewModel.loadAnimals(currentUserId)
     }
 }
 

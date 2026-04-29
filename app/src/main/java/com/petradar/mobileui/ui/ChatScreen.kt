@@ -1,4 +1,4 @@
-﻿@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.petradar.mobileui.ui
 
@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,9 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.petradar.mobileui.api.MessageModel
+import com.petradar.mobileui.utils.PetImageUrlResolver
 import com.petradar.mobileui.viewmodel.ChatViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -33,6 +40,8 @@ fun ChatScreen(
     otherUserId: Long,
     adoptionAnimalId: Long? = null,
     matchId: Long? = null,
+    lostReportId: Long? = null,
+    lostPetLabel: String? = null,
     title: String = "Chat",
     onBack: () -> Unit
 ) {
@@ -43,6 +52,7 @@ fun ChatScreen(
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         while (isActive) {
@@ -75,12 +85,44 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = title,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1
-                    )
+                    if (lostReportId != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(PetImageUrlResolver.reportMainPictureEndpoint(lostReportId))
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Foto de mascota perdida",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                            )
+                            Column {
+                                Text(
+                                    text = lostPetLabel ?: "Mascota perdida",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = "Mascota perdida",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = title,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -94,7 +136,7 @@ fun ChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .imePadding()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

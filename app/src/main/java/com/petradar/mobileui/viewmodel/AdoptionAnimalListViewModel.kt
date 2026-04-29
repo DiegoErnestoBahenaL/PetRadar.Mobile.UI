@@ -1,4 +1,4 @@
-﻿package com.petradar.mobileui.viewmodel
+package com.petradar.mobileui.viewmodel
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -7,58 +7,46 @@ import androidx.lifecycle.viewModelScope
 import com.petradar.mobileui.api.AdoptionAnimalViewModel
 import com.petradar.mobileui.api.AdoptionRequest
 import com.petradar.mobileui.repository.AdoptionAnimalRepository
+import com.petradar.mobileui.repository.MessageRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel that manages the business logic for the adoption animals list.
- *
- * Responsibilities:
- *  - Load all adoption animals from GET /api/AdoptionAnimals.
- *  - Delete an adoption animal via DELETE /api/AdoptionAnimals/{id} and reload the list.
- *  - Maintain UI state (loading, error, delete success) as LiveData.
- *
- * Exposed LiveData:
- *  - [animals]       → list of adoption animals.
- *  - [isLoading]     → true while a network request is in progress.
- *  - [errorMessage]  → error message for the UI; null when there is no error.
- *  - [deleteSuccess] → true immediately after a successful deletion.
- */
 class AdoptionAnimalListViewModel : ViewModel() {
 
     private val repository = AdoptionAnimalRepository()
+    private val messageRepository = MessageRepository()
 
     private val _animals = MutableLiveData<List<AdoptionAnimalViewModel>>(emptyList())
-    /** List of adoption animals. Empty until the first load completes. */
     val animals: LiveData<List<AdoptionAnimalViewModel>> = _animals
 
     private val _isLoading = MutableLiveData<Boolean>()
-    /** true while a network request is active. */
     val isLoading: LiveData<Boolean> = _isLoading
 
     private val _errorMessage = MutableLiveData<String?>()
-    /** Error message to display to the user; null when there is no error. */
     val errorMessage: LiveData<String?> = _errorMessage
 
     private val _deleteSuccess = MutableLiveData<Boolean>()
-    /** Emits true immediately after an adoption animal is successfully deleted. */
     val deleteSuccess: LiveData<Boolean> = _deleteSuccess
 
     private val _adoptSuccess = MutableLiveData<Boolean?>(null)
-    /** Emits true after a successful adoption request; null when no action has been taken yet. */
     val adoptSuccess: LiveData<Boolean?> = _adoptSuccess
 
-    /**
-     * Loads all adoption animals from the API.
-     * Endpoint: GET /api/AdoptionAnimals
-     */
-    fun loadAnimals() {
+    private val _unreadCountByAnimalId = MutableLiveData<Map<Long, Int>>(emptyMap())
+    val unreadCountByAnimalId: LiveData<Map<Long, Int>> = _unreadCountByAnimalId
+
+    private var storedUserId: Long = -1L
+
+    fun loadAnimals(currentUserId: Long = -1L) {
+        if (currentUserId > 0) storedUserId = currentUserId
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
             try {
                 val response = repository.getAll()
                 if (response.isSuccessful) {
-                    _animals.value = response.body() ?: emptyList()
+                    val animals = response.body() ?: emptyList()
+                    _animals.value = animals
+                    if (storedUserId > 0) loadUnreadCounts(animals, storedUserId)
                 } else {
                     _errorMessage.value = "Error loading adoption animals: ${response.code()}"
                 }
@@ -70,12 +58,45 @@ class AdoptionAnimalListViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Deletes an adoption animal from the system and reloads the updated list.
-     * Endpoint: DELETE /api/AdoptionAnimals/{id}
-     *
-     * @param animalId ID of the adoption animal to delete.
-     */
+    private fun loadUnreadCounts(animals: List<AdoptionAnimalViewModel>, currentUserId: Long) {
+        viewModelScope.launch {
+            val counts = mutableMapOf<Long, Int>()
+            val tasks: List<Pair<Long, kotlinx.coroutines.Deferred<Int>>> = animals.flatMap { animal ->
+                val isOwner = animal.shelterId == currentUserId
+                if (isOwner) {
+                    (animal.adoptionRequests ?: emptyList()).map { request ->
+                        animal.id to async {
+                            runCatching {
+                                val r = messageRepository.getAdoptionAnimalConversation(
+                                    animal.id, request.userId, currentUserId
+                                )
+                                if (r.isSuccessful) r.body().orEmpty()
+                                    .count { !it.read && it.recipientId == currentUserId }
+                                else 0
+                            }.getOrDefault(0)
+                        }
+                    }
+                } else if (animal.adoptionRequests?.any { it.userId == currentUserId } == true) {
+                    listOf(animal.id to async {
+                        runCatching {
+                            val r = messageRepository.getAdoptionAnimalConversation(
+                                animal.id, animal.shelterId, currentUserId
+                            )
+                            if (r.isSuccessful) r.body().orEmpty()
+                                .count { !it.read && it.recipientId == currentUserId }
+                            else 0
+                        }.getOrDefault(0)
+                    })
+                } else emptyList()
+            }
+            for ((animalId, deferred) in tasks) {
+                val count = deferred.await()
+                if (count > 0) counts[animalId] = (counts[animalId] ?: 0) + count
+            }
+            _unreadCountByAnimalId.value = counts
+        }
+    }
+
     fun deleteAnimal(animalId: Long) {
         _animals.value = _animals.value?.filter { it.id != animalId }
         viewModelScope.launch {
@@ -101,17 +122,7 @@ class AdoptionAnimalListViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Submits an adoption request for an animal and notifies the owner.
-     * Endpoint: PUT /api/AdoptionAnimals/{id}/adoptionrequest
-     *
-     * @param animalId   ID of the animal.
-     * @param request    Adoption request data filled in by the user.
-     */
-    fun submitAdoptionRequest(
-        animalId: Long,
-        request: AdoptionRequest
-    ) {
+    fun submitAdoptionRequest(animalId: Long, request: AdoptionRequest) {
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
@@ -132,13 +143,6 @@ class AdoptionAnimalListViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Approves an adoption request from a specific user and reloads the list.
-     * Endpoint: PUT /api/AdoptionAnimals/{id}/approveadoptionrequest/{adopterId}
-     *
-     * @param animalId  ID of the animal.
-     * @param adopterId ID of the user whose request is being approved.
-     */
     fun approveAdoptionRequest(animalId: Long, adopterId: Long) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -158,4 +162,3 @@ class AdoptionAnimalListViewModel : ViewModel() {
         }
     }
 }
-

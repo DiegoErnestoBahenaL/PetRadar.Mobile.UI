@@ -65,11 +65,13 @@ class MyReportsActivity : ComponentActivity() {
                     onDeleteReport = { reportId ->
                         viewModel.deleteReport(reportId)
                     },
-                    onOpenMatchChat = { matchId, otherUserId, matchTitle ->
+                    onOpenMatchChat = { matchId, otherUserId, matchTitle, lostReportId, lostPetLabel ->
                         val intent = Intent(this, ChatActivity::class.java).apply {
                             putExtra(ChatActivity.EXTRA_MATCH_ID, matchId)
                             putExtra(ChatActivity.EXTRA_OTHER_USER_ID, otherUserId)
                             putExtra(ChatActivity.EXTRA_ANIMAL_NAME, matchTitle)
+                            putExtra(ChatActivity.EXTRA_LOST_REPORT_ID, lostReportId)
+                            putExtra(ChatActivity.EXTRA_LOST_PET_LABEL, lostPetLabel)
                         }
                         startActivity(intent)
                     }
