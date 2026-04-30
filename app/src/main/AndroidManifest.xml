@@ -127,6 +127,7 @@
             android:name=".ChatActivity"
             android:exported="false"
             android:label="Chat"
+            android:windowSoftInputMode="adjustResize"
             android:parentActivityName=".AdoptionAnimalDetailActivity" />
 
         <provider

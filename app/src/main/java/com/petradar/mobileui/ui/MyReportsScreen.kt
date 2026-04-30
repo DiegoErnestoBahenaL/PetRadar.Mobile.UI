@@ -1,4 +1,6 @@
-﻿package com.petradar.mobileui.ui
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.petradar.mobileui.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +21,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -71,10 +76,11 @@ fun MyReportsScreen(
     onNewReport: () -> Unit = {},
     onEditReport: (ReportViewModel) -> Unit = {},
     onDeleteReport: (Long) -> Unit = {},
-    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String) -> Unit = { _, _, _ -> }
+    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String) -> Unit = { _, _, _, _, _ -> }
 ) {
     val reports by viewModel.reports.observeAsState(emptyList())
     val matchesByReportId by viewModel.matchesByReportId.observeAsState(emptyMap())
+    val unreadCountByMatchId by viewModel.unreadCountByMatchId.observeAsState(emptyMap())
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val deleteSuccess by viewModel.deleteSuccess.observeAsState()
@@ -151,6 +157,7 @@ fun MyReportsScreen(
                                 report = report,
                                 matches = matchesByReportId[report.id] ?: emptyList(),
                                 currentUserId = userId,
+                                unreadCountByMatchId = unreadCountByMatchId,
                                 onEdit = { onEditReport(report) },
                                 onDelete = { onDeleteReport(report.id) },
                                 onOpenMatchChat = onOpenMatchChat
@@ -195,17 +202,28 @@ private fun formatReportDate(dateStr: String?): String {
     }
 }
 
+private fun lostPetLabel(lostReport: ReportViewModel): String {
+    val species = translateReportSpecies(lostReport.species)
+    val breed = lostReport.breed?.takeIf { it.isNotBlank() }
+    return if (breed != null) "$species · $breed" else species
+}
+
 @Composable
 private fun ReportCard(
     report: ReportViewModel,
     matches: List<MatchViewModel>,
     currentUserId: Long,
+    unreadCountByMatchId: Map<Long, Int>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String) -> Unit
+    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMatchDialog by remember { mutableStateOf(false) }
+
+    val totalUnread = remember(matches, unreadCountByMatchId) {
+        matches.sumOf { unreadCountByMatchId[it.id] ?: 0 }
+    }
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -242,10 +260,11 @@ private fun ReportCard(
         MatchListDialog(
             matches = matches,
             currentUserId = currentUserId,
+            unreadCountByMatchId = unreadCountByMatchId,
             onDismiss = { showMatchDialog = false },
-            onOpenChat = { matchId, otherUserId, title ->
+            onOpenChat = { matchId, otherUserId, title, lostReportId, petLabel ->
                 showMatchDialog = false
-                onOpenMatchChat(matchId, otherUserId, title)
+                onOpenMatchChat(matchId, otherUserId, title, lostReportId, petLabel)
             }
         )
     }
@@ -311,31 +330,71 @@ private fun ReportCard(
 
                 if (matches.isNotEmpty()) {
                     Spacer(Modifier.height(4.dp))
-                    FilledTonalButton(
-                        onClick = {
-                            if (matches.size == 1) {
-                                val match = matches.first()
-                                val otherUserId = if (match.lostReport.userId == currentUserId)
-                                    match.strayReport.userId
-                                else
-                                    match.lostReport.userId
-                                onOpenMatchChat(match.id, otherUserId, matchChatTitle(match, currentUserId))
-                            } else {
-                                showMatchDialog = true
-                            }
-                        },
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Default.Pets,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.size(6.dp))
-                        val label = if (matches.size == 1) "1 coincidencia encontrada"
-                                    else "${matches.size} coincidencias encontradas"
-                        Text(label, style = MaterialTheme.typography.labelMedium)
+                        BadgedBox(
+                            badge = {
+                                if (totalUnread > 0) {
+                                    Badge { Text(totalUnread.toString()) }
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            FilledTonalButton(
+                                onClick = {
+                                    if (matches.size == 1) {
+                                        val match = matches.first()
+                                        val otherUserId = if (match.lostReport.userId == currentUserId)
+                                            match.strayReport.userId
+                                        else
+                                            match.lostReport.userId
+                                        onOpenMatchChat(
+                                            match.id,
+                                            otherUserId,
+                                            matchChatTitle(match, currentUserId),
+                                            match.lostReport.id,
+                                            lostPetLabel(match.lostReport)
+                                        )
+                                    } else {
+                                        showMatchDialog = true
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Pets,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.size(6.dp))
+                                val label = if (matches.size == 1) "1 coincidencia"
+                                            else "${matches.size} coincidencias"
+                                Text(label, style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                        if (totalUnread > 0) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Forum,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = if (totalUnread == 1) "1 sin leer" else "$totalUnread sin leer",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -353,8 +412,9 @@ private fun matchChatTitle(match: MatchViewModel, currentUserId: Long): String {
 private fun MatchListDialog(
     matches: List<MatchViewModel>,
     currentUserId: Long,
+    unreadCountByMatchId: Map<Long, Int>,
     onDismiss: () -> Unit,
-    onOpenChat: (matchId: Long, otherUserId: Long, title: String) -> Unit
+    onOpenChat: (matchId: Long, otherUserId: Long, title: String, lostReportId: Long, lostPetLabel: String) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -370,10 +430,22 @@ private fun MatchListDialog(
                     val otherUserId = otherReport.userId
                     val title = matchChatTitle(match, currentUserId)
                     val status = translateMatchStatus(match.status)
+                    val unreadCount = unreadCountByMatchId[match.id] ?: 0
 
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(title, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                if (unreadCount > 0) {
+                                    Badge {
+                                        Text(unreadCount.toString())
+                                    }
+                                }
+                            }
                             Text(
                                 "Estado: $status",
                                 style = MaterialTheme.typography.bodySmall,
@@ -388,7 +460,15 @@ private fun MatchListDialog(
                             }
                             Spacer(Modifier.height(4.dp))
                             FilledTonalButton(
-                                onClick = { onOpenChat(match.id, otherUserId, title) },
+                                onClick = {
+                                    onOpenChat(
+                                        match.id,
+                                        otherUserId,
+                                        title,
+                                        match.lostReport.id,
+                                        lostPetLabel(match.lostReport)
+                                    )
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                             ) {
