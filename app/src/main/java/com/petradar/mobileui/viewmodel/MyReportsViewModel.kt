@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petradar.mobileui.api.MatchViewModel
+import com.petradar.mobileui.api.ReportUpdateModel
 import com.petradar.mobileui.api.ReportViewModel
 import com.petradar.mobileui.repository.MatchRepository
 import com.petradar.mobileui.repository.MessageRepository
@@ -35,6 +36,9 @@ class MyReportsViewModel : ViewModel() {
 
     private val _deleteSuccess = MutableLiveData<Long?>()
     val deleteSuccess: LiveData<Long?> = _deleteSuccess
+
+    private val _dismissSuccess = MutableLiveData<Long?>()
+    val dismissSuccess: LiveData<Long?> = _dismissSuccess
 
     fun loadReports(userId: Long) {
         if (userId <= 0) {
@@ -119,5 +123,27 @@ class MyReportsViewModel : ViewModel() {
 
     fun clearDeleteSuccess() {
         _deleteSuccess.value = null
+    }
+
+    fun dismissReport(reportId: Long) {
+        viewModelScope.launch {
+            try {
+                val response = reportRepository.update(reportId, ReportUpdateModel(reportStatus = "Dismissed"))
+                if (response.isSuccessful) {
+                    _reports.value = _reports.value.orEmpty().map {
+                        if (it.id == reportId) it.copy(reportStatus = "Dismissed") else it
+                    }
+                    _dismissSuccess.value = reportId
+                } else {
+                    _errorMessage.value = "No se pudo descartar el reporte (${response.code()})"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error de conexión: ${e.message}"
+            }
+        }
+    }
+
+    fun clearDismissSuccess() {
+        _dismissSuccess.value = null
     }
 }

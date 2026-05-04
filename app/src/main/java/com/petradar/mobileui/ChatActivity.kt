@@ -20,6 +20,7 @@ class ChatActivity : ComponentActivity() {
         const val EXTRA_OTHER_USER_NAME = "extra_other_user_name"
         const val EXTRA_LOST_REPORT_ID = "extra_lost_report_id"
         const val EXTRA_LOST_PET_LABEL = "extra_lost_pet_label"
+        const val EXTRA_STRAY_REPORT_ID = "extra_stray_report_id"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,8 +32,8 @@ class ChatActivity : ComponentActivity() {
         val otherUserId = intent.getLongExtra(EXTRA_OTHER_USER_ID, -1L)
         val animalName = intent.getStringExtra(EXTRA_ANIMAL_NAME)
         val otherUserName = intent.getStringExtra(EXTRA_OTHER_USER_NAME)
-        val lostReportId = intent.getLongExtra(EXTRA_LOST_REPORT_ID, -1L)
         val lostPetLabel = intent.getStringExtra(EXTRA_LOST_PET_LABEL)
+        val strayReportId = intent.getLongExtra(EXTRA_STRAY_REPORT_ID, -1L)
         val currentUserId = AuthManager.getUserId(this) ?: -1L
 
         val viewModel = ViewModelProvider(this)[ChatViewModel::class.java]
@@ -45,7 +46,7 @@ class ChatActivity : ComponentActivity() {
                     otherUserId = otherUserId,
                     adoptionAnimalId = if (adoptionAnimalId > 0) adoptionAnimalId else null,
                     matchId = if (matchId > 0) matchId else null,
-                    lostReportId = if (lostReportId > 0) lostReportId else null,
+                    strayReportId = if (strayReportId > 0) strayReportId else null,
                     lostPetLabel = lostPetLabel,
                     title = buildString {
                         if (!animalName.isNullOrBlank()) append(animalName)

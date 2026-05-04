@@ -45,6 +45,16 @@ interface ApiService {
     @POST("api/gate/Login/refresh")
     suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<LoginResponse>
 
+    /**
+     * Sends a password-recovery email to the provided address.
+     * Endpoint: POST /api/gate/Login/recoverpassword
+     *
+     * @param request Object containing the user's email ([RecoverPasswordRequest]).
+     * @return HTTP 200 on success (no body); 404 if the email is not registered.
+     */
+    @POST("api/gate/Login/recoverpassword")
+    suspend fun recoverPassword(@Body request: RecoverPasswordRequest): Response<Unit>
+
     // =========================================================================
     // Users  →  /api/Users
     // =========================================================================

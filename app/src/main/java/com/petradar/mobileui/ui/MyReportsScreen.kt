@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Pets
@@ -76,7 +77,8 @@ fun MyReportsScreen(
     onNewReport: () -> Unit = {},
     onEditReport: (ReportViewModel) -> Unit = {},
     onDeleteReport: (Long) -> Unit = {},
-    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String) -> Unit = { _, _, _, _, _ -> }
+    onDismissReport: (Long) -> Unit = {},
+    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val reports by viewModel.reports.observeAsState(emptyList())
     val matchesByReportId by viewModel.matchesByReportId.observeAsState(emptyMap())
@@ -84,6 +86,7 @@ fun MyReportsScreen(
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val deleteSuccess by viewModel.deleteSuccess.observeAsState()
+    val dismissSuccess by viewModel.dismissSuccess.observeAsState()
 
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -100,6 +103,13 @@ fun MyReportsScreen(
         if (deleteSuccess != null) {
             snackbarHostState.showSnackbar("Reporte eliminado correctamente")
             viewModel.clearDeleteSuccess()
+        }
+    }
+
+    LaunchedEffect(dismissSuccess) {
+        if (dismissSuccess != null) {
+            snackbarHostState.showSnackbar("Reporte descartado")
+            viewModel.clearDismissSuccess()
         }
     }
 
@@ -160,6 +170,7 @@ fun MyReportsScreen(
                                 unreadCountByMatchId = unreadCountByMatchId,
                                 onEdit = { onEditReport(report) },
                                 onDelete = { onDeleteReport(report.id) },
+                                onDismiss = { onDismissReport(report.id) },
                                 onOpenMatchChat = onOpenMatchChat
                             )
                         }
@@ -182,6 +193,7 @@ private fun translateReportStatus(status: String?): String = when (status?.lower
     "resolved" -> "Resuelto"
     "adopted" -> "Adoptado"
     "cancelled" -> "Cancelado"
+    "dismissed" -> "Descartado"
     else -> status ?: "Sin estado"
 }
 
@@ -216,9 +228,11 @@ private fun ReportCard(
     unreadCountByMatchId: Map<Long, Int>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String) -> Unit
+    onDismiss: () -> Unit,
+    onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDismissDialog by remember { mutableStateOf(false) }
     var showMatchDialog by remember { mutableStateOf(false) }
 
     val totalUnread = remember(matches, unreadCountByMatchId) {
@@ -256,15 +270,45 @@ private fun ReportCard(
         )
     }
 
+    if (showDismissDialog) {
+        AlertDialog(
+            onDismissRequest = { showDismissDialog = false },
+            icon = {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            title = { Text("¿Descartar reporte?") },
+            text = { Text("El reporte quedará marcado como descartado. Puedes cambiarlo después editándolo.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDismissDialog = false
+                        onDismiss()
+                    }
+                ) {
+                    Text("Descartar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDismissDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     if (showMatchDialog && matches.size > 1) {
         MatchListDialog(
             matches = matches,
             currentUserId = currentUserId,
             unreadCountByMatchId = unreadCountByMatchId,
             onDismiss = { showMatchDialog = false },
-            onOpenChat = { matchId, otherUserId, title, lostReportId, petLabel ->
+            onOpenChat = { matchId, otherUserId, title, lostReportId, petLabel, strayReportId ->
                 showMatchDialog = false
-                onOpenMatchChat(matchId, otherUserId, title, lostReportId, petLabel)
+                onOpenMatchChat(matchId, otherUserId, title, lostReportId, petLabel, strayReportId)
             }
         )
     }
@@ -313,6 +357,16 @@ private fun ReportCard(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
+                    if (report.reportType?.lowercase() == "lost" &&
+                        report.reportStatus?.lowercase() == "active") {
+                        IconButton(onClick = { showDismissDialog = true }) {
+                            Icon(
+                                Icons.Default.Cancel,
+                                contentDescription = "Descartar reporte",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(
                             Icons.Default.Delete,
@@ -356,7 +410,8 @@ private fun ReportCard(
                                             otherUserId,
                                             matchChatTitle(match, currentUserId),
                                             match.lostReport.id,
-                                            lostPetLabel(match.lostReport)
+                                            lostPetLabel(match.lostReport),
+                                            match.strayReport.id
                                         )
                                     } else {
                                         showMatchDialog = true
@@ -414,7 +469,7 @@ private fun MatchListDialog(
     currentUserId: Long,
     unreadCountByMatchId: Map<Long, Int>,
     onDismiss: () -> Unit,
-    onOpenChat: (matchId: Long, otherUserId: Long, title: String, lostReportId: Long, lostPetLabel: String) -> Unit
+    onOpenChat: (matchId: Long, otherUserId: Long, title: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -466,7 +521,8 @@ private fun MatchListDialog(
                                         otherUserId,
                                         title,
                                         match.lostReport.id,
-                                        lostPetLabel(match.lostReport)
+                                        lostPetLabel(match.lostReport),
+                                        match.strayReport.id
                                     )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
