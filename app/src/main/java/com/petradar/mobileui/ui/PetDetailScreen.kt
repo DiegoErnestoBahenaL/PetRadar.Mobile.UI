@@ -46,8 +46,15 @@ import com.petradar.mobileui.utils.MedicationStore
 import com.petradar.mobileui.utils.PetImageUrlResolver
 import com.petradar.mobileui.utils.PetPhotoStore
 import com.petradar.mobileui.viewmodel.PetDetailViewModel
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.core.net.toUri
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import androidx.compose.ui.tooling.preview.Preview
 import com.petradar.mobileui.ui.theme.PetRadarTheme
 import com.petradar.mobileui.api.UserPetViewModel
@@ -244,6 +251,10 @@ fun PetDetailContent(
     var speciesError by remember { mutableStateOf<String?>(null) }
     var showPhotoRequiredDialog by remember { mutableStateOf(false) }
     var photoPromptDismissed by remember { mutableStateOf(false) }
+    var showBirthDatePicker by remember { mutableStateOf(false) }
+    val birthDatePickerState = rememberDatePickerState()
+    val birthDateInteractionSource = remember { MutableInteractionSource() }
+    val isBirthDatePressed by birthDateInteractionSource.collectIsPressedAsState()
 
     // ── Discard-changes guard ────────────────────────────────────────────
     var origName        by remember { mutableStateOf("") }
@@ -357,6 +368,20 @@ fun PetDetailContent(
         if (saveSuccess) onBack()
     }
 
+    LaunchedEffect(birthDate) {
+        if (birthDate.isNotBlank()) {
+            runCatching {
+                val millis = LocalDate.parse(birthDate)
+                    .atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli()
+                birthDatePickerState.selectedDateMillis = millis
+            }
+        }
+    }
+
+    LaunchedEffect(isBirthDatePressed) {
+        if (isBirthDatePressed && !isLoading) showBirthDatePicker = true
+    }
+
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -460,6 +485,32 @@ fun PetDetailContent(
                 }
             }
         )
+    }
+
+    if (showBirthDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showBirthDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    birthDatePickerState.selectedDateMillis?.let { millis ->
+                        birthDate = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.of("UTC")).toLocalDate()
+                            .format(DateTimeFormatter.ISO_LOCAL_DATE)
+                    }
+                    showBirthDatePicker = false
+                }) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBirthDatePicker = false }) { Text("Cancelar") }
+            }
+        ) {
+            DatePicker(
+                state = birthDatePickerState,
+                title = { Text("Fecha de nacimiento", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
+                headline = null,
+                showModeToggle = false
+            )
+        }
     }
 
     Scaffold(
@@ -693,10 +744,25 @@ fun PetDetailContent(
             AnimatedVisibility(visible, enter = fadeIn(tween(400, 200)) + slideInVertically(tween(400, 200)) { 40 }) {
                 Card(shape = RoundedCornerShape(16.dp)) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlinedTextField(value = birthDate, onValueChange = { birthDate = it },
-                            label = { Text("Fecha de nacimiento (YYYY-MM-DD)") },
+                        OutlinedTextField(
+                            value = if (birthDate.isNotBlank()) runCatching {
+                                LocalDate.parse(birthDate)
+                                    .format(DateTimeFormatter.ofPattern("d 'de' MMMM yyyy", Locale("es")))
+                                    .replaceFirstChar { it.uppercase() }
+                            }.getOrElse { birthDate } else "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Fecha de nacimiento") },
                             leadingIcon = { Icon(Icons.Default.DateRange, null) },
-                            modifier = Modifier.fillMaxWidth(), enabled = !isLoading)
+                            trailingIcon = {
+                                IconButton(onClick = { if (!isLoading) showBirthDatePicker = true }) {
+                                    Icon(Icons.Default.EditCalendar, contentDescription = "Seleccionar fecha")
+                                }
+                            },
+                            interactionSource = birthDateInteractionSource,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isLoading
+                        )
                         OutlinedTextField(value = petWeight, onValueChange = { petWeight = it }, label = { Text("Peso (kg)") },
                             leadingIcon = { Icon(Icons.Default.MonitorWeight, null) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),

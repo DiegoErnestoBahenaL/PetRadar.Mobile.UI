@@ -3,6 +3,7 @@
 import com.petradar.mobileui.api.RetrofitClient
 import com.petradar.mobileui.api.models.LoginRequest
 import com.petradar.mobileui.api.models.LoginResponse
+import com.petradar.mobileui.api.models.RecoverPasswordRequest
 import com.petradar.mobileui.api.models.RefreshTokenRequest
 import com.petradar.mobileui.api.models.RegisterRequest
 import retrofit2.Response
@@ -70,6 +71,15 @@ class AuthRepository {
      * @param phoneNumber Contact phone number (optional).
      * @return [Response] with Unit; HTTP 201 on success.
      */
+    /**
+     * Sends a password-recovery email via POST /api/gate/Login/recoverpassword.
+     *
+     * @param email Email of the account whose password must be reset.
+     * @return [Response] with Unit; HTTP 200 on success, 404 if the email is unknown.
+     */
+    suspend fun recoverPassword(email: String): Response<Unit> =
+        apiService.recoverPassword(RecoverPasswordRequest(email))
+
     suspend fun register(
         name: String,
         lastName: String?,

@@ -6,6 +6,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,6 +99,11 @@ fun AppointmentFormScreen(
     var typeExpanded by remember { mutableStateOf(false) }
     var statusExpanded by remember { mutableStateOf(false) }
     var visible by remember { mutableStateOf(isInPreview) }
+
+    val dateInteractionSource = remember { MutableInteractionSource() }
+    val timeInteractionSource = remember { MutableInteractionSource() }
+    val isDatePressed by dateInteractionSource.collectIsPressedAsState()
+    val isTimePressed by timeInteractionSource.collectIsPressedAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val typeOptions = listOf(
@@ -111,6 +119,9 @@ fun AppointmentFormScreen(
     val timeDisplay = remember(selectedTime) {
         selectedTime.format(DateTimeFormatter.ofPattern("HH:mm"))
     }
+
+    LaunchedEffect(isDatePressed) { if (isDatePressed && !isLoading) showDatePicker = true }
+    LaunchedEffect(isTimePressed) { if (isTimePressed && !isLoading) showTimePicker = true }
 
     LaunchedEffect(Unit) { visible = true; viewModel.loadPetsByUser(userId) }
 
@@ -173,17 +184,18 @@ fun AppointmentFormScreen(
 
     if (showDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { },
+            onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         selectedDate = Instant.ofEpochMilli(millis)
                             .atZone(ZoneId.of("UTC")).toLocalDate()
                     }
+                    showDatePicker = false
                 }) { Text("Aceptar") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
             }
         ) {
             DatePicker(
@@ -197,7 +209,7 @@ fun AppointmentFormScreen(
 
     if (showTimePicker) {
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = { showTimePicker = false },
             title = { Text("Selecciona la hora") },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -207,10 +219,11 @@ fun AppointmentFormScreen(
             confirmButton = {
                 TextButton(onClick = {
                     selectedTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                    showTimePicker = false
                 }) { Text("Aceptar") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancelar") }
             }
         )
     }
@@ -326,10 +339,11 @@ fun AppointmentFormScreen(
                             label = { Text("Fecha *") },
                             leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
                             trailingIcon = {
-                                IconButton(onClick = { }) {
+                                IconButton(onClick = { if (!isLoading) showDatePicker = true }) {
                                     Icon(Icons.Default.EditCalendar, contentDescription = "Seleccionar fecha")
                                 }
                             },
+                            interactionSource = dateInteractionSource,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading
                         )
@@ -341,10 +355,11 @@ fun AppointmentFormScreen(
                             label = { Text("Hora *") },
                             leadingIcon = { Icon(Icons.Default.Schedule, null) },
                             trailingIcon = {
-                                IconButton(onClick = { }) {
+                                IconButton(onClick = { if (!isLoading) showTimePicker = true }) {
                                     Icon(Icons.Default.AccessTime, contentDescription = "Seleccionar hora")
                                 }
                             },
+                            interactionSource = timeInteractionSource,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading
                         )
