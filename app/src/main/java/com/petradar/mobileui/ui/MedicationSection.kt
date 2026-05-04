@@ -44,7 +44,7 @@ fun MedicationSection(
     if (showAddDialog || editingReminder != null) {
         MedicationDialog(
             initial = editingReminder,
-            onDismiss = { },
+            onDismiss = { showAddDialog = false; editingReminder = null },
             onConfirm = { reminder ->
                 val updated = if (editingReminder != null) {
                     reminders.map { if (it.id == reminder.id) reminder else it }
@@ -52,6 +52,7 @@ fun MedicationSection(
                     reminders + reminder
                 }
                 onRemindersChanged(updated)
+                showAddDialog = false
                 editingReminder = null
             }
         )
@@ -112,7 +113,7 @@ fun MedicationSection(
                 Spacer(Modifier.height(4.dp))
 
                 OutlinedButton(
-                    onClick = { },
+                    onClick = { showAddDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     enabled = !isLoading
@@ -137,17 +138,17 @@ private fun MedicationReminderRow(
 
     if (showDeleteConfirm) {
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = { showDeleteConfirm = false },
             icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text("Eliminar recordatorio") },
             text = { Text("¿Eliminar el recordatorio de \"${reminder.medicineName}\"?") },
             confirmButton = {
-                TextButton(onClick = { ; onDelete() }) {
+                TextButton(onClick = { showDeleteConfirm = false; onDelete() }) {
                     Text("Eliminar", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancelar") }
             }
         )
     }
@@ -194,7 +195,7 @@ private fun MedicationReminderRow(
         IconButton(onClick = onEdit) {
             Icon(Icons.Default.Edit, null, modifier = Modifier.size(18.dp))
         }
-        IconButton(onClick = { }) {
+        IconButton(onClick = { showDeleteConfirm = true }) {
             Icon(Icons.Default.Delete, null,
                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                 modifier = Modifier.size(18.dp))
@@ -228,7 +229,7 @@ private fun MedicationDialog(
 
     if (showTimePicker) {
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = { showTimePicker = false },
             title = { Text("Hora del recordatorio") },
             text = {
                 Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -239,10 +240,11 @@ private fun MedicationDialog(
                 TextButton(onClick = {
                     hour = timePickerState.hour
                     minute = timePickerState.minute
+                    showTimePicker = false
                 }) { Text("Aceptar") }
             },
             dismissButton = {
-                TextButton(onClick = { }) { Text("Cancelar") }
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancelar") }
             }
         )
     }
@@ -272,7 +274,7 @@ private fun MedicationDialog(
                     label = { Text("Hora de la dosis *") },
                     leadingIcon = { Icon(Icons.Default.Schedule, null) },
                     trailingIcon = {
-                        IconButton(onClick = { }) {
+                        IconButton(onClick = { showTimePicker = true }) {
                             Icon(Icons.Default.AccessTime, null)
                         }
                     },

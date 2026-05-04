@@ -116,6 +116,17 @@ data class RegisterRequest(
  * @property detail   Detailed description of the error (may be null).
  * @property instance URI of the specific problem instance (may be null).
  */
+/**
+ * Request body for recovering a forgotten password.
+ * Maps to the schema expected by POST /api/gate/Login/recoverpassword.
+ *
+ * @property email Email of the account whose password must be reset.
+ */
+data class RecoverPasswordRequest(
+    @SerializedName("email")
+    val email: String
+)
+
 data class ApiError(
     @SerializedName("type")
     val type: String?,
