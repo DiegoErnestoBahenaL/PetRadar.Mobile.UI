@@ -58,6 +58,7 @@ fun LoginScreen(
     val isLoading = isLoadingRaw
     val errorMessage by viewModel.errorMessage.observeAsState()
     val loginSuccess by viewModel.loginSuccess.observeAsState()
+    val recoverPasswordSent by viewModel.recoverPasswordSent.observeAsState()
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -65,6 +66,10 @@ fun LoginScreen(
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var visible by remember { mutableStateOf(false) }
+
+    var showRecoverDialog by remember { mutableStateOf(false) }
+    var recoverEmail by remember { mutableStateOf("") }
+    var recoverEmailError by remember { mutableStateOf<String?>(null) }
 
     val focusManager = LocalFocusManager.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,6 +83,94 @@ fun LoginScreen(
     LaunchedEffect(errorMessage) {
         val msg = errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
+    }
+
+    LaunchedEffect(recoverPasswordSent) {
+        if (recoverPasswordSent == true) {
+            showRecoverDialog = false
+            recoverEmail = ""
+            recoverEmailError = null
+            snackbarHostState.showSnackbar("Correo de recuperación enviado. Revisa tu bandeja.")
+            viewModel.clearRecoverPasswordSent()
+        }
+    }
+
+    if (showRecoverDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isLoading) {
+                    showRecoverDialog = false
+                    recoverEmail = ""
+                    recoverEmailError = null
+                }
+            },
+            icon = { Icon(Icons.Default.Email, contentDescription = null) },
+            title = { Text("Recuperar contraseña") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ingresa tu correo y te enviaremos instrucciones para restablecer tu contraseña.")
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = recoverEmail,
+                        onValueChange = { recoverEmail = it; recoverEmailError = null },
+                        label = { Text("Correo electrónico") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        isError = recoverEmailError != null,
+                        supportingText = recoverEmailError?.let { err -> { Text(err) } },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(onDone = {
+                            focusManager.clearFocus()
+                            if (recoverEmail.isBlank()) {
+                                recoverEmailError = "El correo es requerido"
+                            } else if (!Patterns.EMAIL_ADDRESS.matcher(recoverEmail).matches()) {
+                                recoverEmailError = "Correo inválido"
+                            } else {
+                                viewModel.recoverPassword(recoverEmail)
+                            }
+                        }),
+                        enabled = !isLoading,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (recoverEmail.isBlank()) {
+                            recoverEmailError = "El correo es requerido"
+                        } else if (!Patterns.EMAIL_ADDRESS.matcher(recoverEmail).matches()) {
+                            recoverEmailError = "Correo inválido"
+                        } else {
+                            viewModel.recoverPassword(recoverEmail)
+                        }
+                    },
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("Enviar")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showRecoverDialog = false
+                        recoverEmail = ""
+                        recoverEmailError = null
+                    },
+                    enabled = !isLoading
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     fun validate(): Boolean {
@@ -211,10 +304,23 @@ fun LoginScreen(
                             Text("Entrar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }
+
+                    TextButton(
+                        onClick = { showRecoverDialog = true },
+                        enabled = !isLoading,
+                        modifier = Modifier.align(Alignment.End),
+                        contentPadding = PaddingValues(4.dp)
+                    ) {
+                        Text(
+                            "¿Olvidaste tu contraseña?",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
 
             // ── Register link ──────────────────────────────────
             AnimatedVisibility(
