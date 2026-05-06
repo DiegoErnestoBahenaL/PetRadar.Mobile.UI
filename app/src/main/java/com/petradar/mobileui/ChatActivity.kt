@@ -27,13 +27,20 @@ class ChatActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        // FCM ClickAction (background) delivers data as String extras; foreground PendingIntent uses Long.
         val adoptionAnimalId = intent.getLongExtra(EXTRA_ADOPTION_ANIMAL_ID, -1L)
+            .takeIf { it != -1L } ?: intent.getStringExtra(EXTRA_ADOPTION_ANIMAL_ID)?.toLongOrNull() ?: -1L
         val matchId = intent.getLongExtra(EXTRA_MATCH_ID, -1L)
+            .takeIf { it != -1L } ?: intent.getStringExtra(EXTRA_MATCH_ID)?.toLongOrNull() ?: -1L
         val otherUserId = intent.getLongExtra(EXTRA_OTHER_USER_ID, -1L)
+            .takeIf { it != -1L } ?: intent.getStringExtra(EXTRA_OTHER_USER_ID)?.toLongOrNull() ?: -1L
         val animalName = intent.getStringExtra(EXTRA_ANIMAL_NAME)
         val otherUserName = intent.getStringExtra(EXTRA_OTHER_USER_NAME)
         val lostPetLabel = intent.getStringExtra(EXTRA_LOST_PET_LABEL)
         val strayReportId = intent.getLongExtra(EXTRA_STRAY_REPORT_ID, -1L)
+            .takeIf { it != -1L } ?: intent.getStringExtra(EXTRA_STRAY_REPORT_ID)?.toLongOrNull() ?: -1L
+
+
         val currentUserId = AuthManager.getUserId(this) ?: -1L
 
         val viewModel = ViewModelProvider(this)[ChatViewModel::class.java]
