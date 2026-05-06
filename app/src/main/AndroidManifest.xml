@@ -125,10 +125,17 @@
             android:parentActivityName=".MyReportsActivity" />
         <activity
             android:name=".ChatActivity"
-            android:exported="false"
+            android:exported="true"
             android:label="Chat"
             android:windowSoftInputMode="adjustResize"
-            android:parentActivityName=".AdoptionAnimalDetailActivity" />
+            android:parentActivityName=".AdoptionAnimalDetailActivity">
+
+            <intent-filter>
+                <action android:name="OPEN_CHAT_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"
