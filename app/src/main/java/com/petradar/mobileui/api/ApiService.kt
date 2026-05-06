@@ -530,13 +530,13 @@ interface ApiService {
 
     /**
      * Submits an adoption request for an animal.
-     * Endpoint: PUT /api/AdoptionAnimals/{id}/adoptionrequest
+     * Endpoint: POST /api/AdoptionAnimals/{id}/adoptionrequest
      *
      * @param id      Adoption animal ID.
      * @param request Adoption request data ([AdoptionRequest]).
      * @return HTTP 204 No Content on success.
      */
-    @PUT("api/AdoptionAnimals/{id}/adoptionrequest")
+    @POST("api/AdoptionAnimals/{id}/adoptionrequest")
     suspend fun submitAdoptionRequest(
         @Path("id") id: Long,
         @Body request: AdoptionRequest
@@ -572,6 +572,12 @@ interface ApiService {
 
     @GET("api/Matches/{id}")
     suspend fun getMatchById(@Path("id") id: Long): Response<MatchViewModel>
+
+    @PUT("api/Matches/{id}")
+    suspend fun updateMatch(
+        @Path("id") id: Long,
+        @Body request: MatchUpdateModel
+    ): Response<Unit>
 
     // =========================================================================
     // Messages  →  /api/Messages
@@ -615,6 +621,20 @@ interface ApiService {
         @Path("id") id: Long,
         @Body update: MessageUpdateModel
     ): Response<Unit>
+
+    @GET("api/Messages/match/{matchId}/unreadmessages/{recipientId}/{senderId}")
+    suspend fun getMatchUnreadCount(
+        @Path("matchId") matchId: Long,
+        @Path("recipientId") recipientId: Long,
+        @Path("senderId") senderId: Long
+    ): Response<UnreadMessagesViewModel>
+
+    @GET("api/Messages/adoptionAnimal/{adoptionAnimalId}/unreadmessages/{recipientId}/{senderId}")
+    suspend fun getAdoptionAnimalUnreadCount(
+        @Path("adoptionAnimalId") adoptionAnimalId: Long,
+        @Path("recipientId") recipientId: Long,
+        @Path("senderId") senderId: Long
+    ): Response<UnreadMessagesViewModel>
 }
 
 // =============================================================================
@@ -630,6 +650,11 @@ data class MatchViewModel(
     val status: String? = null,
     val notes: String? = null,
     val confirmationDate: String? = null
+)
+
+data class MatchUpdateModel(
+    val status: String? = null,
+    val notes: String? = null
 )
 
 // =============================================================================
@@ -660,6 +685,10 @@ data class MessageUpdateModel(
     val content: String? = null,
     val read: Boolean? = null,
     val readDate: String? = null
+)
+
+data class UnreadMessagesViewModel(
+    val unreadMessagesCount: Int
 )
 
 // =============================================================================

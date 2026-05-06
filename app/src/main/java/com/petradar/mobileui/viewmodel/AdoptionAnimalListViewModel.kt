@@ -67,24 +67,20 @@ class AdoptionAnimalListViewModel : ViewModel() {
                     (animal.adoptionRequests ?: emptyList()).map { request ->
                         animal.id to async {
                             runCatching {
-                                val r = messageRepository.getAdoptionAnimalConversation(
-                                    animal.id, request.userId, currentUserId
+                                val r = messageRepository.getAdoptionAnimalUnreadCount(
+                                    animal.id, currentUserId, request.userId
                                 )
-                                if (r.isSuccessful) r.body().orEmpty()
-                                    .count { !it.read && it.recipientId == currentUserId }
-                                else 0
+                                if (r.isSuccessful) r.body()?.unreadMessagesCount ?: 0 else 0
                             }.getOrDefault(0)
                         }
                     }
                 } else if (animal.adoptionRequests?.any { it.userId == currentUserId } == true) {
                     listOf(animal.id to async {
                         runCatching {
-                            val r = messageRepository.getAdoptionAnimalConversation(
-                                animal.id, animal.shelterId, currentUserId
+                            val r = messageRepository.getAdoptionAnimalUnreadCount(
+                                animal.id, currentUserId, animal.shelterId
                             )
-                            if (r.isSuccessful) r.body().orEmpty()
-                                .count { !it.read && it.recipientId == currentUserId }
-                            else 0
+                            if (r.isSuccessful) r.body()?.unreadMessagesCount ?: 0 else 0
                         }.getOrDefault(0)
                     })
                 } else emptyList()

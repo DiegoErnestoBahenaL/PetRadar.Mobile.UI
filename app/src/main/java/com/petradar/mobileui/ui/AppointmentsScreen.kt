@@ -344,7 +344,7 @@ fun AppointmentsScreen(
                             appointment = appt,
                             pet = userPets.find { it.id == appt.petId },
                             onEdit = { onEditAppointment(appt) },
-                            onDelete = { }
+                            onDelete = { showDeleteDialog = appt }
                         )
                     }
                     item { Spacer(Modifier.height(80.dp)) }

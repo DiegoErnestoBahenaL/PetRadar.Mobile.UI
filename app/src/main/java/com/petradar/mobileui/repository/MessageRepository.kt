@@ -23,4 +23,12 @@ class MessageRepository {
 
     suspend fun markAsRead(id: Long, readDate: String) =
         api.updateMessage(id, MessageUpdateModel(read = true, readDate = readDate))
+
+    suspend fun getMatchUnreadCount(
+        matchId: Long, recipientId: Long, senderId: Long
+    ) = api.getMatchUnreadCount(matchId, recipientId, senderId)
+
+    suspend fun getAdoptionAnimalUnreadCount(
+        adoptionAnimalId: Long, recipientId: Long, senderId: Long
+    ) = api.getAdoptionAnimalUnreadCount(adoptionAnimalId, recipientId, senderId)
 }

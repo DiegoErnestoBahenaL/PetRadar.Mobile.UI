@@ -59,6 +59,7 @@ fun LoginScreen(
     val errorMessage by viewModel.errorMessage.observeAsState()
     val loginSuccess by viewModel.loginSuccess.observeAsState()
     val recoverPasswordSent by viewModel.recoverPasswordSent.observeAsState()
+    val recoverPasswordError by viewModel.recoverPasswordError.observeAsState()
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -93,6 +94,12 @@ fun LoginScreen(
             snackbarHostState.showSnackbar("Correo de recuperación enviado. Revisa tu bandeja.")
             viewModel.clearRecoverPasswordSent()
         }
+    }
+
+    LaunchedEffect(recoverPasswordError) {
+        val err = recoverPasswordError ?: return@LaunchedEffect
+        recoverEmailError = err
+        viewModel.clearRecoverPasswordError()
     }
 
     if (showRecoverDialog) {

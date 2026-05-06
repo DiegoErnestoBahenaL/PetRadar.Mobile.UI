@@ -5,7 +5,6 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petradar.mobileui.api.MatchViewModel
-import com.petradar.mobileui.api.ReportUpdateModel
 import com.petradar.mobileui.api.ReportViewModel
 import com.petradar.mobileui.repository.MatchRepository
 import com.petradar.mobileui.repository.MessageRepository
@@ -37,8 +36,8 @@ class MyReportsViewModel : ViewModel() {
     private val _deleteSuccess = MutableLiveData<Long?>()
     val deleteSuccess: LiveData<Long?> = _deleteSuccess
 
-    private val _dismissSuccess = MutableLiveData<Long?>()
-    val dismissSuccess: LiveData<Long?> = _dismissSuccess
+    private val _dismissMatchSuccess = MutableLiveData<Long?>()
+    val dismissMatchSuccess: LiveData<Long?> = _dismissMatchSuccess
 
     fun loadReports(userId: Long) {
         if (userId <= 0) {
@@ -90,10 +89,8 @@ class MyReportsViewModel : ViewModel() {
                     match.lostReport.userId
                 match.id to async {
                     runCatching {
-                        val r = messageRepository.getMatchConversation(match.id, otherUserId, userId)
-                        if (r.isSuccessful) r.body().orEmpty()
-                            .count { !it.read && it.recipientId == userId }
-                        else 0
+                        val r = messageRepository.getMatchUnreadCount(match.id, userId, otherUserId)
+                        if (r.isSuccessful) r.body()?.unreadMessagesCount ?: 0 else 0
                     }.getOrDefault(0)
                 }
             }
@@ -125,17 +122,24 @@ class MyReportsViewModel : ViewModel() {
         _deleteSuccess.value = null
     }
 
-    fun dismissReport(reportId: Long) {
+    fun dismissMatch(matchId: Long) {
         viewModelScope.launch {
             try {
-                val response = reportRepository.update(reportId, ReportUpdateModel(reportStatus = "Dismissed"))
+                val response = matchRepository.dismissMatch(matchId)
                 if (response.isSuccessful) {
-                    _reports.value = _reports.value.orEmpty().map {
-                        if (it.id == reportId) it.copy(reportStatus = "Dismissed") else it
+                    val updatedMap = _matchesByReportId.value.orEmpty().toMutableMap()
+                    for ((reportId, matches) in updatedMap.toMap()) {
+                        val filtered = matches.filter { it.id != matchId }
+                        if (filtered.isEmpty()) updatedMap.remove(reportId)
+                        else updatedMap[reportId] = filtered
                     }
-                    _dismissSuccess.value = reportId
+                    _matchesByReportId.value = updatedMap
+                    val updatedCounts = _unreadCountByMatchId.value.orEmpty().toMutableMap()
+                    updatedCounts.remove(matchId)
+                    _unreadCountByMatchId.value = updatedCounts
+                    _dismissMatchSuccess.value = matchId
                 } else {
-                    _errorMessage.value = "No se pudo descartar el reporte (${response.code()})"
+                    _errorMessage.value = "No se pudo descartar la coincidencia (${response.code()})"
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Error de conexión: ${e.message}"
@@ -143,7 +147,7 @@ class MyReportsViewModel : ViewModel() {
         }
     }
 
-    fun clearDismissSuccess() {
-        _dismissSuccess.value = null
+    fun clearDismissMatchSuccess() {
+        _dismissMatchSuccess.value = null
     }
 }

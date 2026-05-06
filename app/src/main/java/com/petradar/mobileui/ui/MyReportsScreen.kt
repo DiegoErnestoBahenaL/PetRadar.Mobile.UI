@@ -77,7 +77,7 @@ fun MyReportsScreen(
     onNewReport: () -> Unit = {},
     onEditReport: (ReportViewModel) -> Unit = {},
     onDeleteReport: (Long) -> Unit = {},
-    onDismissReport: (Long) -> Unit = {},
+    onDismissMatch: (Long) -> Unit = {},
     onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val reports by viewModel.reports.observeAsState(emptyList())
@@ -86,7 +86,7 @@ fun MyReportsScreen(
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val deleteSuccess by viewModel.deleteSuccess.observeAsState()
-    val dismissSuccess by viewModel.dismissSuccess.observeAsState()
+    val dismissMatchSuccess by viewModel.dismissMatchSuccess.observeAsState()
 
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,10 +106,10 @@ fun MyReportsScreen(
         }
     }
 
-    LaunchedEffect(dismissSuccess) {
-        if (dismissSuccess != null) {
-            snackbarHostState.showSnackbar("Reporte descartado")
-            viewModel.clearDismissSuccess()
+    LaunchedEffect(dismissMatchSuccess) {
+        if (dismissMatchSuccess != null) {
+            snackbarHostState.showSnackbar("Coincidencia descartada")
+            viewModel.clearDismissMatchSuccess()
         }
     }
 
@@ -170,7 +170,7 @@ fun MyReportsScreen(
                                 unreadCountByMatchId = unreadCountByMatchId,
                                 onEdit = { onEditReport(report) },
                                 onDelete = { onDeleteReport(report.id) },
-                                onDismiss = { onDismissReport(report.id) },
+                                onDismissMatch = onDismissMatch,
                                 onOpenMatchChat = onOpenMatchChat
                             )
                         }
@@ -228,11 +228,11 @@ private fun ReportCard(
     unreadCountByMatchId: Map<Long, Int>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onDismiss: () -> Unit,
+    onDismissMatch: (Long) -> Unit,
     onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showDismissDialog by remember { mutableStateOf(false) }
+    var showDismissMatchDialog by remember { mutableStateOf<Long?>(null) }
     var showMatchDialog by remember { mutableStateOf(false) }
 
     val totalUnread = remember(matches, unreadCountByMatchId) {
@@ -270,9 +270,9 @@ private fun ReportCard(
         )
     }
 
-    if (showDismissDialog) {
+    if (showDismissMatchDialog != null) {
         AlertDialog(
-            onDismissRequest = { showDismissDialog = false },
+            onDismissRequest = { showDismissMatchDialog = null },
             icon = {
                 Icon(
                     Icons.Default.Cancel,
@@ -280,20 +280,21 @@ private fun ReportCard(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
-            title = { Text("¿Descartar reporte?") },
-            text = { Text("El reporte quedará marcado como descartado. Puedes cambiarlo después editándolo.") },
+            title = { Text("¿Descartar coincidencia?") },
+            text = { Text("Esta coincidencia se marcará como descartada. Tus demás coincidencias no se ven afectadas y puedes seguir recibiendo nuevas.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showDismissDialog = false
-                        onDismiss()
+                        val matchId = showDismissMatchDialog
+                        showDismissMatchDialog = null
+                        if (matchId != null) onDismissMatch(matchId)
                     }
                 ) {
                     Text("Descartar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDismissDialog = false }) {
+                TextButton(onClick = { showDismissMatchDialog = null }) {
                     Text("Cancelar")
                 }
             }
@@ -306,6 +307,10 @@ private fun ReportCard(
             currentUserId = currentUserId,
             unreadCountByMatchId = unreadCountByMatchId,
             onDismiss = { showMatchDialog = false },
+            onDismissMatch = { matchId ->
+                showMatchDialog = false
+                onDismissMatch(matchId)
+            },
             onOpenChat = { matchId, otherUserId, title, lostReportId, petLabel, strayReportId ->
                 showMatchDialog = false
                 onOpenMatchChat(matchId, otherUserId, title, lostReportId, petLabel, strayReportId)
@@ -357,16 +362,6 @@ private fun ReportCard(
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f)
                     )
-                    if (report.reportType?.lowercase() == "lost" &&
-                        report.reportStatus?.lowercase() == "active") {
-                        IconButton(onClick = { showDismissDialog = true }) {
-                            Icon(
-                                Icons.Default.Cancel,
-                                contentDescription = "Descartar reporte",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                     IconButton(onClick = { showDeleteDialog = true }) {
                         Icon(
                             Icons.Default.Delete,
@@ -431,6 +426,15 @@ private fun ReportCard(
                                 Text(label, style = MaterialTheme.typography.labelMedium)
                             }
                         }
+                        if (matches.size == 1) {
+                            IconButton(onClick = { showDismissMatchDialog = matches.first().id }) {
+                                Icon(
+                                    Icons.Default.Cancel,
+                                    contentDescription = "Descartar coincidencia",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                         if (totalUnread > 0) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -469,8 +473,39 @@ private fun MatchListDialog(
     currentUserId: Long,
     unreadCountByMatchId: Map<Long, Int>,
     onDismiss: () -> Unit,
+    onDismissMatch: (Long) -> Unit,
     onOpenChat: (matchId: Long, otherUserId: Long, title: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
+    var pendingDismissMatchId by remember { mutableStateOf<Long?>(null) }
+
+    if (pendingDismissMatchId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDismissMatchId = null },
+            icon = {
+                Icon(
+                    Icons.Default.Cancel,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            title = { Text("¿Descartar coincidencia?") },
+            text = { Text("Esta coincidencia se marcará como descartada. Tus demás coincidencias no se ven afectadas y puedes seguir recibiendo nuevas.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val matchId = pendingDismissMatchId
+                    pendingDismissMatchId = null
+                    if (matchId != null) {
+                        onDismissMatch(matchId)
+                        onDismiss()
+                    }
+                }) { Text("Descartar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDismissMatchId = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -514,21 +549,30 @@ private fun MatchListDialog(
                                 )
                             }
                             Spacer(Modifier.height(4.dp))
-                            FilledTonalButton(
-                                onClick = {
-                                    onOpenChat(
-                                        match.id,
-                                        otherUserId,
-                                        title,
-                                        match.lostReport.id,
-                                        lostPetLabel(match.lostReport),
-                                        match.strayReport.id
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        onOpenChat(
+                                            match.id,
+                                            otherUserId,
+                                            title,
+                                            match.lostReport.id,
+                                            lostPetLabel(match.lostReport),
+                                            match.strayReport.id
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Chatear")
+                                }
+                                IconButton(onClick = { pendingDismissMatchId = match.id }) {
+                                    Icon(
+                                        Icons.Default.Cancel,
+                                        contentDescription = "Descartar coincidencia",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                            ) {
-                                Text("Chatear")
+                                }
                             }
                         }
                     }
