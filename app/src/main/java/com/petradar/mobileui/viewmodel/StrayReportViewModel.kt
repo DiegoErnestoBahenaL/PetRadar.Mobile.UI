@@ -29,6 +29,12 @@ class StrayReportViewModel : ViewModel() {
     private val _saveSuccess = MutableLiveData(false)
     val saveSuccess: LiveData<Boolean> = _saveSuccess
 
+    private val _photoUploadFailed = MutableLiveData<Boolean?>(null)
+    val photoUploadFailed: LiveData<Boolean?> = _photoUploadFailed
+
+    var pendingReportId: Long = -1L
+        private set
+
     fun createStrayReport(
         request: ReportCreateModel,
         photoUri: String? = null,
@@ -45,17 +51,24 @@ class StrayReportViewModel : ViewModel() {
                     if (context != null) {
                         val createdReportId = resolveCreatedReportId(request.userId)
                         if (createdReportId != null) {
-                            try {
-                                if (!photoUri.isNullOrBlank()) {
+                            pendingReportId = createdReportId
+                            if (!photoUri.isNullOrBlank()) {
+                                val photoOk = try {
                                     uploadMainPicture(createdReportId, photoUri, context)
+                                } catch (_: Exception) {
+                                    true
                                 }
+                                if (!photoOk) {
+                                    _photoUploadFailed.value = true
+                                    _isLoading.value = false
+                                    return@launch
+                                }
+                            }
+                            try {
                                 if (additionalPhotoUris.isNotEmpty()) {
                                     uploadAdditionalPhotos(createdReportId, additionalPhotoUris, context)
                                 }
-                            } catch (_: Exception) {
-                                // El reporte ya fue creado; si la subida de foto falla
-                                // por timeout u otro error de red, no bloqueamos el éxito.
-                            }
+                            } catch (_: Exception) { }
                         }
                     }
                     _saveSuccess.value = true
@@ -76,8 +89,31 @@ class StrayReportViewModel : ViewModel() {
         return response.body()?.maxByOrNull { it.id }?.id
     }
 
-    private suspend fun uploadMainPicture(reportId: Long, uriString: String, context: Context) {
-        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
+    fun retryPhotoUpload(uri: String, context: Context) {
+        if (pendingReportId <= 0) return
+        viewModelScope.launch {
+            _isLoading.value = true
+            _photoUploadFailed.value = null
+            val success = try {
+                uploadMainPicture(pendingReportId, uri, context)
+            } catch (_: Exception) {
+                false
+            }
+            if (success) {
+                _saveSuccess.value = true
+            } else {
+                _photoUploadFailed.value = true
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun clearPhotoUploadFailed() {
+        _photoUploadFailed.value = null
+    }
+
+    private suspend fun uploadMainPicture(reportId: Long, uriString: String, context: Context): Boolean {
+        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return false
         val filePart = withContext(Dispatchers.IO) {
             val scheme = uri.scheme?.lowercase() ?: ""
             val isRemote = scheme == "http" || scheme == "https"
@@ -101,12 +137,14 @@ class StrayReportViewModel : ViewModel() {
             }
             val requestBody = bytes.toRequestBody(mimeType.toMediaTypeOrNull())
             MultipartBody.Part.createFormData("file", "report_main.$extension", requestBody)
-        } ?: return
+        } ?: return false
 
         val uploadResponse = reportRepository.uploadMainPicture(reportId, filePart)
         if (!uploadResponse.isSuccessful) {
-            _errorMessage.value = "No se pudo subir la foto principal (${uploadResponse.code()})"
+            _errorMessage.value = "La foto no fue reconocida. Selecciona otra imagen e intenta de nuevo."
+            return false
         }
+        return true
     }
 
     private suspend fun uploadAdditionalPhotos(

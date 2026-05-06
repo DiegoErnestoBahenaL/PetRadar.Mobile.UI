@@ -183,9 +183,16 @@ class PetDetailViewModel : ViewModel() {
                 if (response.isSuccessful) {
                     val createdPetId = resolveCreatedPetId(userId, name)
                     if (createdPetId != null) {
+                        currentPetId = createdPetId
                         if (!photoUri.isNullOrBlank()) {
                             PetPhotoStore.save(context, createdPetId, photoUri)
-                            uploadPetMainPicture(createdPetId, photoUri, context)
+                            val photoOk = uploadPetMainPicture(createdPetId, photoUri, context)
+                            if (!photoOk) {
+                                try { repository.deletePet(createdPetId) } catch (_: Exception) { }
+                                currentPetId = -1L
+                                _isLoading.value = false
+                                return@launch
+                            }
                         }
                         if (additionalPhotoUris.isNotEmpty()) {
                             uploadAdditionalPhotosInternal(createdPetId, additionalPhotoUris, context)
@@ -244,11 +251,15 @@ class PetDetailViewModel : ViewModel() {
                 val response = repository.updatePet(petId, request)
                 if (response.isSuccessful) {
                     if (!photoUri.isNullOrBlank()) {
-                        try {
-                            PetPhotoStore.save(context, petId, photoUri)
+                        PetPhotoStore.save(context, petId, photoUri)
+                        val photoOk = try {
                             uploadPetMainPicture(petId, photoUri, context)
-                        } catch (e: Exception) {
-                            _errorMessage.value = "Pet updated, but photo upload failed: ${e.message}"
+                        } catch (_: Exception) {
+                            true
+                        }
+                        if (!photoOk) {
+                            _isLoading.value = false
+                            return@launch
                         }
                     }
                     if (additionalPhotoUris.isNotEmpty()) {
@@ -292,10 +303,10 @@ class PetDetailViewModel : ViewModel() {
         }
     }
 
-    private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context) {
+    private suspend fun uploadPetMainPicture(petId: Long, uriString: String, context: Context): Boolean {
         val uri = runCatching { uriString.toUri() }.getOrNull() ?: run {
             _errorMessage.value = "No se pudo leer la imagen seleccionada."
-            return
+            return false
         }
 
         val filePart = withContext(Dispatchers.IO) {
@@ -315,11 +326,13 @@ class PetDetailViewModel : ViewModel() {
                 filename = "pet_main.$extension",
                 body = requestBody
             )
-        } ?: return
+        } ?: return false
 
         val response = repository.uploadPetMainPicture(petId, filePart)
         if (!response.isSuccessful) {
-            _errorMessage.value = "Error al subir la foto (${response.code()}). Inténtalo de nuevo."
+            _errorMessage.value = "La foto no fue reconocida. Selecciona otra imagen e intenta de nuevo."
+            return false
         }
+        return true
     }
 }

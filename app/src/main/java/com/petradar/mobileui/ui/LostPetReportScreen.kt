@@ -125,9 +125,11 @@ fun LostPetReportScreen(
     val isLoading by viewModel.isLoading.observeAsState(false)
     val errorMessage by viewModel.errorMessage.observeAsState()
     val saveSuccess by viewModel.saveSuccess.observeAsState(false)
+    val photoUploadFailed by viewModel.photoUploadFailed.observeAsState()
     val petAdditionalPhotoNames by viewModel.petAdditionalPhotoNames.observeAsState(emptyList())
 
     var mainPhotoUri by remember { mutableStateOf<Uri?>(initialPhotoUri?.toUri()) }
+    var showPhotoRetryDialog by remember { mutableStateOf(false) }
 
     // When the pet loads, pre-fill the main photo from the API if no photo was passed from HomeActivity
     LaunchedEffect(pet) {
@@ -142,6 +144,45 @@ fun LostPetReportScreen(
     val mainGalleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? -> if (uri != null) mainPhotoUri = uri }
+
+    var cameraRetryUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoRetryCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && cameraRetryUri != null) {
+            mainPhotoUri = cameraRetryUri
+            showPhotoRetryDialog = false
+            viewModel.clearPhotoUploadFailed()
+            viewModel.retryPhotoUpload(cameraRetryUri!!.toString(), context)
+        }
+    }
+
+    val photoRetryCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            val file = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "lost_retry_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            cameraRetryUri = uri
+            photoRetryCameraLauncher.launch(uri)
+        }
+    }
+
+    fun launchRetryCamera() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            val file = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+                .let { File(it, "lost_retry_${System.currentTimeMillis()}.jpg") }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            cameraRetryUri = uri
+            photoRetryCameraLauncher.launch(uri)
+        } else {
+            photoRetryCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     val mainCameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
@@ -265,8 +306,35 @@ fun LostPetReportScreen(
         errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
+    LaunchedEffect(photoUploadFailed) {
+        if (photoUploadFailed == true) showPhotoRetryDialog = true
+    }
+
     LaunchedEffect(saveSuccess) {
         if (saveSuccess) onSaved()
+    }
+
+    if (showPhotoRetryDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            icon = { Icon(Icons.Default.AddAPhoto, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Foto no reconocida") },
+            text = { Text("La foto principal no pudo ser procesada por el sistema. Vuelve a tomar la foto para que pueda reconocerla correctamente.") },
+            confirmButton = {
+                TextButton(onClick = { launchRetryCamera() }) {
+                    Text("Volver a tomar la foto")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showPhotoRetryDialog = false
+                    viewModel.clearPhotoUploadFailed()
+                    onBack()
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Scaffold(

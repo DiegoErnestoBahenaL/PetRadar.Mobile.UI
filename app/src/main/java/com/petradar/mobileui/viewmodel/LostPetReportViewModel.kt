@@ -36,6 +36,12 @@ class LostPetReportViewModel : ViewModel() {
     private val _saveSuccess = MutableLiveData(false)
     val saveSuccess: LiveData<Boolean> = _saveSuccess
 
+    private val _photoUploadFailed = MutableLiveData<Boolean?>(null)
+    val photoUploadFailed: LiveData<Boolean?> = _photoUploadFailed
+
+    var pendingReportId: Long = -1L
+        private set
+
     private val _petAdditionalPhotoNames = MutableLiveData<List<String>>(emptyList())
     val petAdditionalPhotoNames: LiveData<List<String>> = _petAdditionalPhotoNames
 
@@ -81,20 +87,26 @@ class LostPetReportViewModel : ViewModel() {
                     if (context != null) {
                         val createdReportId = resolveCreatedReportId(request.userId)
                         if (createdReportId != null) {
-                            try {
-                                if (!photoUri.isNullOrBlank()) {
+                            pendingReportId = createdReportId
+                            if (!photoUri.isNullOrBlank()) {
+                                val photoOk = try {
                                     uploadReportMainPicture(createdReportId, photoUri, context)
+                                } catch (_: Exception) {
+                                    true
                                 }
-                                // Auto-copy the pet's additional photos to the report
+                                if (!photoOk) {
+                                    _photoUploadFailed.value = true
+                                    _isLoading.value = false
+                                    return@launch
+                                }
+                            }
+                            try {
                                 val petId = request.userPetId ?: 0L
                                 val petPhotoNames = _petAdditionalPhotoNames.value.orEmpty()
                                 if (petId > 0 && petPhotoNames.isNotEmpty()) {
                                     copyPetPhotosToReport(petId, petPhotoNames, createdReportId)
                                 }
-                            } catch (_: Exception) {
-                                // El reporte ya fue creado; si la subida de foto falla
-                                // por timeout u otro error de red, no bloqueamos el éxito.
-                            }
+                            } catch (_: Exception) { }
                         }
                     }
                     _saveSuccess.value = true
@@ -143,8 +155,31 @@ class LostPetReportViewModel : ViewModel() {
         return response.body()?.maxByOrNull { it.id }?.id
     }
 
-    private suspend fun uploadReportMainPicture(reportId: Long, uriString: String, context: Context) {
-        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return
+    fun retryPhotoUpload(uri: String, context: Context) {
+        if (pendingReportId <= 0) return
+        viewModelScope.launch {
+            _isLoading.value = true
+            _photoUploadFailed.value = null
+            val success = try {
+                uploadReportMainPicture(pendingReportId, uri, context)
+            } catch (_: Exception) {
+                false
+            }
+            if (success) {
+                _saveSuccess.value = true
+            } else {
+                _photoUploadFailed.value = true
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun clearPhotoUploadFailed() {
+        _photoUploadFailed.value = null
+    }
+
+    private suspend fun uploadReportMainPicture(reportId: Long, uriString: String, context: Context): Boolean {
+        val uri = runCatching { uriString.toUri() }.getOrNull() ?: return false
         val filePart = withContext(Dispatchers.IO) {
             val scheme = uri.scheme?.lowercase() ?: ""
             val isRemote = scheme == "http" || scheme == "https"
@@ -172,12 +207,14 @@ class LostPetReportViewModel : ViewModel() {
                 filename = "report_main.$extension",
                 body = requestBody
             )
-        } ?: return
+        } ?: return false
 
         val uploadResponse = reportRepository.uploadMainPicture(reportId, filePart)
         if (!uploadResponse.isSuccessful) {
-            _errorMessage.value = "No se pudo subir la foto del reporte (${uploadResponse.code()})"
+            _errorMessage.value = "La foto no fue reconocida. Selecciona otra imagen e intenta de nuevo."
+            return false
         }
+        return true
     }
 }
 
