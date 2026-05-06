@@ -295,22 +295,27 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     /** Emits true when the recovery email was sent successfully. */
     val recoverPasswordSent: LiveData<Boolean?> = _recoverPasswordSent
 
+    private val _recoverPasswordError = MutableLiveData<String?>()
+    /** Emits the error message specifically for the recovery dialog (shown inline, not as Snackbar). */
+    val recoverPasswordError: LiveData<String?> = _recoverPasswordError
+
     fun recoverPassword(email: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            _errorMessage.value = null
+            _recoverPasswordError.value = null
             try {
                 val response = authRepository.recoverPassword(email)
                 if (response.isSuccessful) {
                     _recoverPasswordSent.value = true
                 } else {
-                    _errorMessage.value = when (response.code()) {
+                    _recoverPasswordError.value = when (response.code()) {
                         404 -> "No existe una cuenta con ese correo electrónico"
+                        400 -> "El correo ingresado no es válido"
                         else -> "Error al enviar el correo (${response.code()})"
                     }
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Error de conexión: ${e.message}"
+                _recoverPasswordError.value = "Error de conexión: ${e.message}"
             } finally {
                 _isLoading.value = false
             }
@@ -319,6 +324,10 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearRecoverPasswordSent() {
         _recoverPasswordSent.value = null
+    }
+
+    fun clearRecoverPasswordError() {
+        _recoverPasswordError.value = null
     }
 
     // ── Email verification polling ────────────────────────────────────────────
