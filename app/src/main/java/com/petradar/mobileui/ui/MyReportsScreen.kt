@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Pets
@@ -78,6 +79,7 @@ fun MyReportsScreen(
     onEditReport: (ReportViewModel) -> Unit = {},
     onDeleteReport: (Long) -> Unit = {},
     onDismissMatch: (Long) -> Unit = {},
+    onConfirmMatch: (Long) -> Unit = {},
     onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val reports by viewModel.reports.observeAsState(emptyList())
@@ -87,6 +89,7 @@ fun MyReportsScreen(
     val errorMessage by viewModel.errorMessage.observeAsState()
     val deleteSuccess by viewModel.deleteSuccess.observeAsState()
     val dismissMatchSuccess by viewModel.dismissMatchSuccess.observeAsState()
+    val confirmMatchSuccess by viewModel.confirmMatchSuccess.observeAsState()
 
     var isRefreshing by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -110,6 +113,13 @@ fun MyReportsScreen(
         if (dismissMatchSuccess != null) {
             snackbarHostState.showSnackbar("Coincidencia descartada")
             viewModel.clearDismissMatchSuccess()
+        }
+    }
+
+    LaunchedEffect(confirmMatchSuccess) {
+        if (confirmMatchSuccess != null) {
+            snackbarHostState.showSnackbar("Coincidencia confirmada")
+            viewModel.clearConfirmMatchSuccess()
         }
     }
 
@@ -171,6 +181,7 @@ fun MyReportsScreen(
                                 onEdit = { onEditReport(report) },
                                 onDelete = { onDeleteReport(report.id) },
                                 onDismissMatch = onDismissMatch,
+                                onConfirmMatch = onConfirmMatch,
                                 onOpenMatchChat = onOpenMatchChat
                             )
                         }
@@ -229,10 +240,12 @@ private fun ReportCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismissMatch: (Long) -> Unit,
+    onConfirmMatch: (Long) -> Unit,
     onOpenMatchChat: (matchId: Long, otherUserId: Long, matchTitle: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showDismissMatchDialog by remember { mutableStateOf<Long?>(null) }
+    var showConfirmMatchDialog by remember { mutableStateOf<Long?>(null) }
     var showMatchDialog by remember { mutableStateOf(false) }
 
     val totalUnread = remember(matches, unreadCountByMatchId) {
@@ -301,6 +314,37 @@ private fun ReportCard(
         )
     }
 
+    if (showConfirmMatchDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showConfirmMatchDialog = null },
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("¿Confirmar coincidencia?") },
+            text = { Text("Al confirmar indicas que este animal callejero es tu mascota perdida. La coincidencia quedará marcada como confirmada.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val matchId = showConfirmMatchDialog
+                        showConfirmMatchDialog = null
+                        if (matchId != null) onConfirmMatch(matchId)
+                    }
+                ) {
+                    Text("Confirmar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmMatchDialog = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     if (showMatchDialog && matches.size > 1) {
         MatchListDialog(
             matches = matches,
@@ -310,6 +354,10 @@ private fun ReportCard(
             onDismissMatch = { matchId ->
                 showMatchDialog = false
                 onDismissMatch(matchId)
+            },
+            onConfirmMatch = { matchId ->
+                showMatchDialog = false
+                onConfirmMatch(matchId)
             },
             onOpenChat = { matchId, otherUserId, title, lostReportId, petLabel, strayReportId ->
                 showMatchDialog = false
@@ -427,12 +475,27 @@ private fun ReportCard(
                             }
                         }
                         if (matches.size == 1) {
-                            IconButton(onClick = { showDismissMatchDialog = matches.first().id }) {
-                                Icon(
-                                    Icons.Default.Cancel,
-                                    contentDescription = "Descartar coincidencia",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            val singleMatch = matches.first()
+                            val isLostReportOwner = singleMatch.lostReport.userId == currentUserId
+                            val isPending = singleMatch.status?.lowercase() != "confirmed" &&
+                                singleMatch.status?.lowercase() != "dismissed"
+                            if (isLostReportOwner && isPending) {
+                                IconButton(onClick = { showConfirmMatchDialog = singleMatch.id }) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = "Confirmar coincidencia",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            if (isLostReportOwner) {
+                                IconButton(onClick = { showDismissMatchDialog = singleMatch.id }) {
+                                    Icon(
+                                        Icons.Default.Cancel,
+                                        contentDescription = "Descartar coincidencia",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                         if (totalUnread > 0) {
@@ -474,9 +537,11 @@ private fun MatchListDialog(
     unreadCountByMatchId: Map<Long, Int>,
     onDismiss: () -> Unit,
     onDismissMatch: (Long) -> Unit,
+    onConfirmMatch: (Long) -> Unit,
     onOpenChat: (matchId: Long, otherUserId: Long, title: String, lostReportId: Long, lostPetLabel: String, strayReportId: Long) -> Unit
 ) {
     var pendingDismissMatchId by remember { mutableStateOf<Long?>(null) }
+    var pendingConfirmMatchId by remember { mutableStateOf<Long?>(null) }
 
     if (pendingDismissMatchId != null) {
         AlertDialog(
@@ -506,6 +571,34 @@ private fun MatchListDialog(
         )
     }
 
+    if (pendingConfirmMatchId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingConfirmMatchId = null },
+            icon = {
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("¿Confirmar coincidencia?") },
+            text = { Text("Al confirmar indicas que este animal callejero es tu mascota perdida. La coincidencia quedará marcada como confirmada.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val matchId = pendingConfirmMatchId
+                    pendingConfirmMatchId = null
+                    if (matchId != null) {
+                        onConfirmMatch(matchId)
+                        onDismiss()
+                    }
+                }) { Text("Confirmar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingConfirmMatchId = null }) { Text("Cancelar") }
+            }
+        )
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -521,6 +614,9 @@ private fun MatchListDialog(
                     val title = matchChatTitle(match, currentUserId)
                     val status = translateMatchStatus(match.status)
                     val unreadCount = unreadCountByMatchId[match.id] ?: 0
+                    val isPending = match.status?.lowercase() != "confirmed" &&
+                        match.status?.lowercase() != "dismissed"
+                    val isLostReportOwner = match.lostReport.userId == currentUserId
 
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -566,12 +662,23 @@ private fun MatchListDialog(
                                 ) {
                                     Text("Chatear")
                                 }
-                                IconButton(onClick = { pendingDismissMatchId = match.id }) {
-                                    Icon(
-                                        Icons.Default.Cancel,
-                                        contentDescription = "Descartar coincidencia",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                if (isLostReportOwner && isPending) {
+                                    IconButton(onClick = { pendingConfirmMatchId = match.id }) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = "Confirmar coincidencia",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                if (isLostReportOwner) {
+                                    IconButton(onClick = { pendingDismissMatchId = match.id }) {
+                                        Icon(
+                                            Icons.Default.Cancel,
+                                            contentDescription = "Descartar coincidencia",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }

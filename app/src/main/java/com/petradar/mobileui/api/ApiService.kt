@@ -654,7 +654,8 @@ data class MatchViewModel(
 
 data class MatchUpdateModel(
     val status: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val confirmationDate: String? = null
 )
 
 // =============================================================================

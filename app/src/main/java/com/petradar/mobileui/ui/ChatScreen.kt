@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -183,54 +184,83 @@ fun ChatScreen(
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { paddingValues ->
-            when {
-                isLoading && messages.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(paddingValues),
-                        contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator() }
-                }
-                messages.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(paddingValues),
-                        contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Send,
-                                contentDescription = null,
-                                modifier = Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                "Sin mensajes aún",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            )
-                            Text(
-                                "¡Sé el primero en escribir!",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(15.dp).padding(top = 1.dp)
+                        )
+                        Text(
+                            text = "PetRadar no se responsabiliza por los comentarios de otros usuarios. No compartas datos bancarios ni información personal sensible.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
-                else -> {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        items(messages, key = { it.id }) { message ->
-                            MessageBubble(
-                                message = message,
-                                isOwn = message.senderId == currentUserId
-                            )
+
+                when {
+                    isLoading && messages.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) { CircularProgressIndicator() }
+                    }
+                    messages.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "Sin mensajes aún",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                Text(
+                                    "¡Sé el primero en escribir!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                            }
+                        }
+                    }
+                    else -> {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            items(messages, key = { it.id }) { message ->
+                                MessageBubble(
+                                    message = message,
+                                    isOwn = message.senderId == currentUserId
+                                )
+                            }
                         }
                     }
                 }
