@@ -68,6 +68,9 @@ class MyReportsActivity : ComponentActivity() {
                     onDismissMatch = { matchId ->
                         viewModel.dismissMatch(matchId)
                     },
+                    onConfirmMatch = { matchId ->
+                        viewModel.confirmMatch(matchId)
+                    },
                     onOpenMatchChat = { matchId, otherUserId, matchTitle, lostReportId, lostPetLabel, strayReportId ->
                         val intent = Intent(this, ChatActivity::class.java).apply {
                             putExtra(ChatActivity.EXTRA_MATCH_ID, matchId)

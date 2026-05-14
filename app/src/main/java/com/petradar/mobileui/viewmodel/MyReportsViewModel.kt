@@ -39,6 +39,9 @@ class MyReportsViewModel : ViewModel() {
     private val _dismissMatchSuccess = MutableLiveData<Long?>()
     val dismissMatchSuccess: LiveData<Long?> = _dismissMatchSuccess
 
+    private val _confirmMatchSuccess = MutableLiveData<Long?>()
+    val confirmMatchSuccess: LiveData<Long?> = _confirmMatchSuccess
+
     fun loadReports(userId: Long) {
         if (userId <= 0) {
             _errorMessage.value = "Usuario no identificado"
@@ -149,5 +152,31 @@ class MyReportsViewModel : ViewModel() {
 
     fun clearDismissMatchSuccess() {
         _dismissMatchSuccess.value = null
+    }
+
+    fun confirmMatch(matchId: Long) {
+        viewModelScope.launch {
+            try {
+                val response = matchRepository.confirmMatch(matchId)
+                if (response.isSuccessful) {
+                    val updatedMap = _matchesByReportId.value.orEmpty().toMutableMap()
+                    for ((reportId, matches) in updatedMap.toMap()) {
+                        updatedMap[reportId] = matches.map { match ->
+                            if (match.id == matchId) match.copy(status = "Confirmed") else match
+                        }
+                    }
+                    _matchesByReportId.value = updatedMap
+                    _confirmMatchSuccess.value = matchId
+                } else {
+                    _errorMessage.value = "No se pudo confirmar la coincidencia (${response.code()})"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "Error de conexión: ${e.message}"
+            }
+        }
+    }
+
+    fun clearConfirmMatchSuccess() {
+        _confirmMatchSuccess.value = null
     }
 }

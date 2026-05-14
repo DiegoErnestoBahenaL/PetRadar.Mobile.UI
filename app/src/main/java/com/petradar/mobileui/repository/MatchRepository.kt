@@ -10,4 +10,10 @@ class MatchRepository {
 
     suspend fun dismissMatch(matchId: Long) =
         api.updateMatch(matchId, MatchUpdateModel(status = "Dismissed"))
+
+    suspend fun confirmMatch(matchId: Long) =
+        api.updateMatch(matchId, MatchUpdateModel(
+            status = "Confirmed",
+            confirmationDate = java.time.Instant.now().toString()
+        ))
 }
