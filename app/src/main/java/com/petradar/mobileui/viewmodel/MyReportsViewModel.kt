@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.petradar.mobileui.api.MatchViewModel
+import com.petradar.mobileui.api.ReportUpdateModel
 import com.petradar.mobileui.api.ReportViewModel
 import com.petradar.mobileui.repository.MatchRepository
 import com.petradar.mobileui.repository.MessageRepository
@@ -59,7 +60,8 @@ class MyReportsViewModel : ViewModel() {
                 val matchesResponse = matchesDeferred.await()
 
                 if (reportsResponse.isSuccessful) {
-                    _reports.value = reportsResponse.body() ?: emptyList()
+                    _reports.value = (reportsResponse.body() ?: emptyList())
+                        .filter { it.reportStatus?.lowercase() != "resolved" }
                 } else {
                     _errorMessage.value = "No se pudieron cargar los reportes (${reportsResponse.code()})"
                 }
@@ -159,13 +161,26 @@ class MyReportsViewModel : ViewModel() {
             try {
                 val response = matchRepository.confirmMatch(matchId)
                 if (response.isSuccessful) {
-                    val updatedMap = _matchesByReportId.value.orEmpty().toMutableMap()
-                    for ((reportId, matches) in updatedMap.toMap()) {
-                        updatedMap[reportId] = matches.map { match ->
-                            if (match.id == matchId) match.copy(status = "Confirmed") else match
-                        }
+                    val confirmedMatch = _matchesByReportId.value.orEmpty()
+                        .values.flatten().find { it.id == matchId }
+
+                    if (confirmedMatch != null) {
+                        val lostReportId = confirmedMatch.lostReport.id
+                        val strayReportId = confirmedMatch.strayReport.id
+                        val resolvedUpdate = ReportUpdateModel(reportStatus = "Resolved")
+
+                        async { runCatching { reportRepository.update(lostReportId, resolvedUpdate) } }
+                        async { runCatching { reportRepository.update(strayReportId, resolvedUpdate) } }
+
+                        _reports.value = _reports.value.orEmpty()
+                            .filter { it.id != lostReportId && it.id != strayReportId }
+
+                        val updatedMap = _matchesByReportId.value.orEmpty().toMutableMap()
+                        updatedMap.remove(lostReportId)
+                        updatedMap.remove(strayReportId)
+                        _matchesByReportId.value = updatedMap
                     }
-                    _matchesByReportId.value = updatedMap
+
                     _confirmMatchSuccess.value = matchId
                 } else {
                     _errorMessage.value = "No se pudo confirmar la coincidencia (${response.code()})"

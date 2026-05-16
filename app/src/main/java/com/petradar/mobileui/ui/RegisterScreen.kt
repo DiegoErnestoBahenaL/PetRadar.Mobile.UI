@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -102,6 +103,7 @@ fun RegisterScreen(
     // Photo state
     var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var showPhotoSheet by remember { mutableStateOf(false) }
+    var showPrivacySheet by remember { mutableStateOf(false) }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
 
     fun createCameraUri(): Uri {
@@ -132,6 +134,120 @@ fun RegisterScreen(
     LaunchedEffect(errorMessage) {
         val msg = errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
+    }
+
+    // Privacy notice bottom sheet
+    if (showPrivacySheet) {
+        ModalBottomSheet(onDismissRequest = { showPrivacySheet = false }) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 48.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Aviso de Privacidad",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Última actualización: 28 de abril de 2026",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                Text("1. Identidad del responsable", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "El responsable del tratamiento de los datos personales recabados a través de la aplicación móvil y del sitio web PetRadar es Diego Ernesto Bahena López (en adelante, \"PetRadar\", \"nosotros\" o \"el responsable\"), con domicilio en Guadalajara, Jalisco, México. Para cualquier consulta relacionada con este aviso puede contactarnos en business@petradar-qa.org.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("2. Alcance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Este aviso describe cómo PetRadar recopila, utiliza, almacena, comparte y protege la información personal de las personas que utilizan nuestra aplicación móvil para Android, nuestra aplicación web y los servicios relacionados (en conjunto, los \"Servicios\"). Al utilizar los Servicios usted acepta las prácticas descritas en este documento.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("3. Información que recopilamos", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("Recopilamos las siguientes categorías de información:", style = MaterialTheme.typography.bodyMedium)
+                Text("• Datos de cuenta: nombre, correo electrónico, contraseña cifrada y, opcionalmente, número de teléfono, proporcionados al registrarse.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Datos de mascota: nombre, especie, raza, edad, sexo, color, señas particulares, fotografías y cualquier otra información que el usuario decida agregar a la ficha de su mascota.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Reportes y avistamientos: descripciones, fotografías, ubicación aproximada y fecha del evento reportado.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Imágenes y contenido de la cámara: fotografías que el usuario decide tomar o seleccionar para asociarlas a una mascota o a un reporte de avistamiento.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Datos de ubicación: ubicación geográfica aproximada asociada a un reporte o avistamiento, cuando el usuario opta por proporcionarla.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Datos técnicos y de uso: identificadores del dispositivo, versión del sistema operativo, modelo, idioma, registros de errores y eventos de uso necesarios para operar y mejorar el servicio.", style = MaterialTheme.typography.bodyMedium)
+
+                Text("4. Permiso de cámara (android.permission.CAMERA)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "La aplicación móvil de PetRadar solicita el permiso de cámara con la finalidad exclusiva de permitir al usuario tomar fotografías de su mascota para crear o actualizar la ficha de identificación, o fotografiar animales avistados para incluirlos en un reporte.\n\nEl acceso a la cámara se activa únicamente cuando el usuario presiona de forma explícita el botón correspondiente. PetRadar no accede a la cámara en segundo plano, no graba audio, no graba vídeo y no recopila imágenes sin la acción directa del usuario.\n\nPuede revocar el permiso en cualquier momento desde Ajustes → Aplicaciones → PetRadar → Permisos.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("5. Finalidades del tratamiento", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("• Crear y administrar su cuenta de usuario.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Registrar mascotas y reportes de avistamientos, y mostrarlos a la comunidad para favorecer la reunificación de mascotas perdidas.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Generar alertas y notificaciones cuando se detecten posibles coincidencias entre mascotas reportadas como perdidas y avistamientos cercanos.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Operar, mantener, depurar y mejorar los Servicios.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Cumplir con obligaciones legales aplicables y prevenir usos indebidos del servicio.", style = MaterialTheme.typography.bodyMedium)
+
+                Text("6. Base de legitimación", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "El tratamiento de los datos se realiza con fundamento en el consentimiento que el usuario otorga al registrarse y utilizar los Servicios, así como en el interés legítimo de PetRadar para prestar y mejorar la plataforma y cumplir con sus obligaciones legales.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("7. Compartición con terceros", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("PetRadar no vende su información personal. Compartimos datos únicamente en los siguientes supuestos:", style = MaterialTheme.typography.bodyMedium)
+                Text("• Visibilidad pública dentro del servicio: la información contenida en una ficha de mascota perdida o en un reporte de avistamiento puede ser visible para otros usuarios de la comunidad.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Proveedores de infraestructura: empleamos proveedores de alojamiento en la nube, almacenamiento y análisis para operar el servicio.", style = MaterialTheme.typography.bodyMedium)
+                Text("• Autoridades: cuando la legislación aplicable lo requiera o ante un requerimiento válido de autoridad competente.", style = MaterialTheme.typography.bodyMedium)
+
+                Text("8. Conservación de los datos", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Conservamos sus datos mientras su cuenta permanezca activa y por los periodos adicionales necesarios para cumplir con obligaciones legales, resolver disputas o hacer cumplir nuestros acuerdos. Cuando los datos ya no sean necesarios, serán eliminados o anonimizados.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("9. Derechos del titular", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Usted tiene derecho a acceder, rectificar, cancelar u oponerse al tratamiento de sus datos personales (derechos ARCO), así como a revocar el consentimiento otorgado y a limitar el uso o divulgación de su información. Para ejercer estos derechos puede editar o eliminar fichas, reportes y fotografías directamente desde la aplicación, o solicitar la eliminación total de su cuenta enviando una solicitud a business@petradar-qa.org desde la dirección de correo registrada.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("10. Seguridad", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Implementamos medidas técnicas, administrativas y físicas razonables para proteger sus datos personales contra el acceso no autorizado, la pérdida, alteración o divulgación. Las contraseñas se almacenan cifradas y la comunicación con nuestros servidores se realiza mediante conexiones HTTPS.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("11. Menores de edad", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Los Servicios no están dirigidos a menores de 13 años. Si tomamos conocimiento de que hemos recopilado información personal de un menor sin el consentimiento verificable de quien ejerce la patria potestad o tutela, eliminaremos dicha información a la brevedad.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("12. Transferencias internacionales", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Sus datos pueden ser almacenados o procesados en servidores ubicados fuera de su país de residencia. En todos los casos adoptamos las medidas necesarias para que dichas transferencias se realicen con un nivel de protección adecuado.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("13. Cambios a este aviso", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Podemos actualizar este Aviso de Privacidad para reflejar cambios en nuestras prácticas o por motivos legales u operativos. Publicaremos la versión vigente e indicaremos la fecha de la última actualización. Le recomendamos revisarlo periódicamente.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+
+                Text("14. Contacto", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Para cualquier duda, comentario o ejercicio de derechos relacionados con este Aviso de Privacidad, puede comunicarse con nosotros a través del correo business@petradar-qa.org.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
     }
 
     // Photo source bottom sheet
@@ -400,12 +516,28 @@ fun RegisterScreen(
                                 checkedColor = MaterialTheme.colorScheme.primary
                             )
                         )
-                        Text(
-                            text = if (privacyError) "Debes aceptar el aviso de privacidad"
-                            else "Acepto el aviso de privacidad",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (privacyError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground
-                        )
+                        if (privacyError) {
+                            Text(
+                                text = "Debes aceptar el aviso de privacidad",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            Text(
+                                text = "Acepto el ",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "aviso de privacidad",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    textDecoration = TextDecoration.Underline
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.clickable(enabled = !isLoading) {
+                                    showPrivacySheet = true
+                                }
+                            )
+                        }
                     }
 
                     Button(
