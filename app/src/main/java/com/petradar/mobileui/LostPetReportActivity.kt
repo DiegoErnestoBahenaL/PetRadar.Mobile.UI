@@ -55,7 +55,7 @@ class LostPetReportActivity : ComponentActivity() {
                                 species = pet?.species ?: "Dog",
                                 breed = pet?.breed,
                                 color = pet?.color,
-                                sex = pet?.sex,
+                                sex = form.sex,
                                 size = pet?.size,
                                 approximateAge = pet?.approximateAge,
                                 weight = pet?.weight,

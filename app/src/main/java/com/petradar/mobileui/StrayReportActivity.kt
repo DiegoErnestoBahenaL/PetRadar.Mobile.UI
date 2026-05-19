@@ -47,6 +47,7 @@ class StrayReportActivity : ComponentActivity() {
                                 hasCollar = form.hasCollar,
                                 hasTag = form.hasTag,
                                 size = form.size,
+                                sex = form.sex,
                                 incidentDate = form.incidentDateIso,
                                 latitude = form.latitude,
                                 longitude = form.longitude,
