@@ -40,7 +40,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,6 +104,7 @@ data class LostReportFormData(
     val incidentDateIso: String,
     val hasCollar: Boolean,
     val hasTag: Boolean,
+    val sex: String?,
     val searchRadiusMeters: Int,
     val useAlternateContact: Boolean,
     val contactName: String?,
@@ -129,13 +133,17 @@ fun LostPetReportScreen(
     val petAdditionalPhotoNames by viewModel.petAdditionalPhotoNames.observeAsState(emptyList())
 
     var mainPhotoUri by remember { mutableStateOf<Uri?>(initialPhotoUri?.toUri()) }
+    var selectedSex by remember { mutableStateOf<String?>(null) }
     var showPhotoRetryDialog by remember { mutableStateOf(false) }
 
-    // When the pet loads, pre-fill the main photo from the API if no photo was passed from HomeActivity
+    // When the pet loads, pre-fill the main photo and sex from the pet profile
     LaunchedEffect(pet) {
         val loadedPet = pet ?: return@LaunchedEffect
         if (mainPhotoUri == null && loadedPet.id > 0) {
             mainPhotoUri = PetImageUrlResolver.mainPictureEndpoint(loadedPet.id).toUri()
+        }
+        if (selectedSex == null && loadedPet.sex != null) {
+            selectedSex = loadedPet.sex
         }
     }
     var cameraImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -223,6 +231,7 @@ fun LostPetReportScreen(
     var detailsText by remember { mutableStateOf("") }
     var hasCollar by remember { mutableStateOf(false) }
     var hasTag by remember { mutableStateOf(false) }
+    var sexDropdownExpanded by remember { mutableStateOf(false) }
     var useAlternateContact by remember { mutableStateOf(false) }
     var contactName by remember { mutableStateOf("") }
     var contactPhone by remember { mutableStateOf("") }
@@ -593,6 +602,41 @@ fun LostPetReportScreen(
                 Switch(checked = hasTag, onCheckedChange = { hasTag = it }, enabled = !isLoading)
             }
 
+            val sexOptions = listOf(
+                null to "No especificado",
+                "Male" to "Macho",
+                "Female" to "Hembra",
+                "Unknown" to "Desconocido"
+            )
+            ExposedDropdownMenuBox(
+                expanded = sexDropdownExpanded,
+                onExpandedChange = { sexDropdownExpanded = !sexDropdownExpanded }
+            ) {
+                OutlinedTextField(
+                    value = sexOptions.find { it.first == selectedSex }?.second ?: "No especificado",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Sexo") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sexDropdownExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    enabled = !isLoading
+                )
+                ExposedDropdownMenu(
+                    expanded = sexDropdownExpanded,
+                    onDismissRequest = { sexDropdownExpanded = false }
+                ) {
+                    sexOptions.forEach { (value, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                selectedSex = value
+                                sexDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Usar contacto alternativo", modifier = Modifier.weight(1f))
                 Switch(
@@ -659,6 +703,7 @@ fun LostPetReportScreen(
                         incidentDateIso = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
                         hasCollar = hasCollar,
                         hasTag = hasTag,
+                        sex = selectedSex,
                         searchRadiusMeters = 3000,
                         useAlternateContact = useAlternateContact,
                         contactName = contactName.trim().ifEmpty { null },

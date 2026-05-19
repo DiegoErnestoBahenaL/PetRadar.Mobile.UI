@@ -108,7 +108,8 @@ data class StrayReportFormData(
     val hasCollar: Boolean,
     val hasTag: Boolean,
     val incidentDateIso: String,
-    val size: String?
+    val size: String?,
+    val sex: String?
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,6 +155,8 @@ fun StrayReportScreen(
     var hasTag by remember { mutableStateOf(false) }
     var selectedSize by remember { mutableStateOf<String?>(null) }
     var sizeDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedSex by remember { mutableStateOf<String?>(null) }
+    var sexDropdownExpanded by remember { mutableStateOf(false) }
 
     // ── Photo launchers ────────────────────────────────────────────────────────
     val mainGalleryLauncher = rememberLauncherForActivityResult(
@@ -789,6 +792,42 @@ fun StrayReportScreen(
                             }
                         }
                     }
+                    val sexOptions = listOf(
+                        null to "No especificado",
+                        "Male" to "Macho",
+                        "Female" to "Hembra",
+                        "Unknown" to "Desconocido"
+                    )
+                    ExposedDropdownMenuBox(
+                        expanded = sexDropdownExpanded,
+                        onExpandedChange = { sexDropdownExpanded = !sexDropdownExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = sexOptions.find { it.first == selectedSex }?.second ?: "No especificado",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Sexo") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sexDropdownExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            enabled = !isLoading
+                        )
+                        ExposedDropdownMenu(
+                            expanded = sexDropdownExpanded,
+                            onDismissRequest = { sexDropdownExpanded = false }
+                        ) {
+                            sexOptions.forEach { (value, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = {
+                                        selectedSex = value
+                                        sexDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -805,7 +844,8 @@ fun StrayReportScreen(
                         hasTag = hasTag,
                         incidentDateIso = LocalDateTime.now()
                             .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                        size = selectedSize
+                        size = selectedSize,
+                        sex = selectedSex
                     )
                     val localMain = mainPhotoUri?.let { uri ->
                         val scheme = uri.scheme?.lowercase() ?: ""
